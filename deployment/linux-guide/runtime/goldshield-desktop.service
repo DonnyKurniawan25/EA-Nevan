@@ -1,0 +1,15 @@
+[Unit]
+Description=Desktop privat untuk MT5 GoldShield
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tigervncserver :1 -fg -localhost yes -SecurityTypes VncAuth -geometry 1600x900 -depth 24 -xstartup %h/goldshield-linux/runtime/vnc-xstartup
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,12 @@
+; This symbol was verified from the connected Exness DEMO account and live quotes.
+; Monitor-only: no opening, closing, or modification trade requests.
+ExecutionMode=1
+EnableAutoTrading=false
+DemoTradingOptIn=false
+AllowRealTrading=false
+TradeSymbol=XAUUSDm
+SignalTimeframe=15
+MagicNumber=26011060
+GridEnabled=false
+ApiEnabled=false
+TelegramEnabled=false

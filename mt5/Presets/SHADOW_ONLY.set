@@ -1,0 +1,11 @@
+; Phase 1: no trade requests. Set symbol/timeframe explicitly to the actual chart.
+ExecutionMode=1
+EnableAutoTrading=false
+DemoTradingOptIn=false
+AllowRealTrading=false
+TradeSymbol=XAUUSD
+SignalTimeframe=15
+MagicNumber=26011060
+GridEnabled=false
+ApiEnabled=false
+TelegramEnabled=false

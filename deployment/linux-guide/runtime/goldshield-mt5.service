@@ -1,0 +1,17 @@
+[Unit]
+Description=GoldShield MT5 DEMO20 melalui Wine
+Requires=goldshield-desktop.service
+After=goldshield-desktop.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=%h/goldshield-linux/runtime/start-mt5.sh run
+Restart=always
+RestartSec=15
+TimeoutStopSec=45
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,15 @@
+; Phase 1 TEST TEMPLATE, not approved for forward demo. Entry remains disabled.
+ExecutionMode=2
+EnableAutoTrading=false
+DemoTradingOptIn=false
+AllowRealTrading=false
+TradeSymbol=XAUUSD
+SignalTimeframe=15
+MagicNumber=26011060
+BaseLot=0.01
+MaxRiskPerTradePct=0.5
+MaxAggregateOpenRiskPct=1.0
+MaxTotalAccountLots=0.10
+GridEnabled=false
+ApiEnabled=false
+TelegramEnabled=false

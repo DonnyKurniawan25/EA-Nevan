@@ -1,0 +1,32 @@
+{
+  "prepared_at_wita": "2026-11-06T23:52:21.269432+08:00",
+  "status": "USER_GUIDE_AND_TEMPLATES_ONLY_NOT_DEPLOYED",
+  "target": "Ubuntu 24.04 x86_64 example; actual server unverified",
+  "runtime_validation": "NOT_EXECUTED_ON_USER_SERVER",
+  "expert_version": "1.220",
+  "magic": 2611061815392,
+  "maximum_entry_submissions": 20,
+  "real_account_allowed": false,
+  "includes_credentials": false,
+  "includes_frozen_live_state": false,
+  "original_protected_files_verified": 19,
+  "files": {
+    "EXPORT_DEMO20_STATE.ps1": "bd8a96e5100ea2f929ebb22d8078c45af622b8c5acdf7b64847677db57ce9725",
+    "Experts/GoldShield_DEMO20.ex5": "3e7b1404cf312ef3be17a8cbc8b48f50a39cb17acb7265b8420d15ac3e58c2c7",
+    "PANDUAN_SERVER_LINUX.md": "79b1a8c1341ce312f7df53dc6d64fa16947748337eb3beffa46d59820abf49c5",
+    "README.md": "79b1a8c1341ce312f7df53dc6d64fa16947748337eb3beffa46d59820abf49c5",
+    "config/SERVER_DEMO20.ini": "55927b795008c3242c309d29dc8b3ab0637292bd642f250b203d2c4de4774e23",
+    "config/SETUP.ini": "43ed03ec8cc3f0dc270a9077e9e90aeb634b9d560d7da4d4d2cf35b3a4c884e1",
+    "config/STAGE.ini": "c770228c784323c5de99f810bbfc4f647e9c84a5796058a4be9de9880a14ce7a",
+    "migration-settings.example.json": "ba007525b07ebf9e0cf477dc861235b8f40543c2ff4f27bd2b0a885ce2011b5f",
+    "presets/DEMO20_CURRENT.set": "44a2bd3c5a1844894af29a83e8c221a7cbbe220a82532c1b95f8137aa4810f0b",
+    "presets/DEMO20_SERVER_STAGE.set": "3b254da79a33a83f7371c537218109379610353948a3bd9505305cb985f21f85",
+    "runtime.env": "0bdeb3f44dccb3030e741d931ae1fb5f006839acf11927f7332f46e2b256c221",
+    "runtime/goldshield-desktop.service": "42654fee0fae5106af77c04dc30eee6b469bdaf1b907df66c091eec6d523ca1e",
+    "runtime/goldshield-mt5.service": "f39a9415807179bb16b8179b4f5714f0f655be2f0b4bdad5975bc06ec9d50901",
+    "runtime/import-frozen-state.py": "97560b03d8ce8574f1ebf42065900cbbcba8c6533caa3b97f6955adb39261b3b",
+    "runtime/start-mt5.sh": "2d305cede34e2081a644f71e7195c671ecd94f4c15289c69f6630a2eee30e099",
+    "runtime/vnc-xstartup": "418ebf277e3e7fa24deff7f57d06b60bda79b43d4cedbabdafcab8329af87e3a"
+  },
+  "distribution": "GitHub source plus verified runtime templates; no live account state"
+}
