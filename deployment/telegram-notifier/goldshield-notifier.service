@@ -1,0 +1,46 @@
+[Unit]
+Description=GoldShield read-only DEMO Telegram notifications
+Wants=network-online.target
+After=network-online.target
+# Import the original PC state before baselining historical CSV files.
+ConditionPathExists=/home/ubuntu/goldshield-linux/state-import-receipt.json
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=/etc/goldshield/telegram.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /home/ubuntu/EA-Nevan/tools/telegram_notifier.py
+Restart=on-failure
+RestartSec=15
+StateDirectory=goldshield-notifier
+StateDirectoryMode=0700
+MemoryMax=128M
+CPUQuota=20%
+TasksMax=32
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/goldshield-notifier
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
