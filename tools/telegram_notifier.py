@@ -40,17 +40,33 @@ def audit_message(row):
     event = item["event"]
     label = LABELS.get(event)
     signature = None
+    symbol = item["symbol"] if re.fullmatch(r"(?:XAUUSD|BTCUSD)[A-Za-z0-9._-]{0,8}", item["symbol"]) else "[symbol redacted]"
     if event == "STATE":
         match = re.fullmatch(r"[A-Z_]+ -> ([A-Z_]+)", item["details"])
         if not match or match[1] not in ALERT_STATES:
             return None, None
         label = "Status pengaman: " + match[1]
         signature = match[1] + ":" + (item["reason_code"] if item["reason_code"] in REASONS else "OTHER")
+    elif event == "SIGNAL":
+        match = re.match(r"^(GS_BUY|GS_SELL)\b", item["details"])
+        if not match:
+            return None, None
+        side = "BUY" if match.group(1) == "GS_BUY" else "SELL"
+        label = f"Sinyal {side} terdeteksi"
+        reason = item["reason_code"] if item["reason_code"] in REASONS | {"CANDIDATE_BASELINE_EMA_RSI"} else "OTHER_REASON_REDACTED"
+        metrics = dict(re.findall(r"\b(close|fast|slow|rsi|atr)=([0-9]+(?:\.[0-9]+)?)", item["details"]))
+        parts = [f"Aksi: {side}"]
+        if "close" in metrics:
+            parts.append(f"Harga: {metrics['close']}")
+        if "rsi" in metrics:
+            parts.append(f"RSI: {metrics['rsi']}")
+        if "atr" in metrics:
+            parts.append(f"ATR: {metrics['atr']}")
+        return ("GoldShield DEMO | " + label + "\n" + symbol + " | " + reason + "\n" + " | ".join(parts))[:1500], None
     if not label:
         return None, None
     # Discard arbitrary text; only exact reason constants and numeric detail keys.
     reason = item["reason_code"] if item["reason_code"] in REASONS else "OTHER_REASON_REDACTED"
-    symbol = item["symbol"] if re.fullmatch(r"(?:XAUUSD|BTCUSD)[A-Za-z0-9._-]{0,8}", item["symbol"]) else "[symbol redacted]"
     values = []
     for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
         values.append(key + "=" + value)

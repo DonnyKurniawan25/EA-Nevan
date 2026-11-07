@@ -14,9 +14,9 @@ AUDIT = "event_id,server_time,utc_time,clock_source,event,symbol,candle_id_serve
 SNAPSHOT = "time_server,account_mode,symbol,limit,entry_submissions,filled_positions,closed_positions,wins,losses,net_closed,currency,open_positions,trial_status,core_state,core_reason\r\n"
 
 
-def audit(event="ORDER_RESULT", details="method=true retcode=10009 order=12 deal=13 filled_volume=0.01", reason="RECONCILIATION_REQUIRED", event_id="1234-1"):
+def audit(event="ORDER_RESULT", details="method=true retcode=10009 order=12 deal=13 filled_volume=0.01", reason="RECONCILIATION_REQUIRED", event_id="1234-1", symbol="XAUUSD"):
     out = io.StringIO(newline="")
-    csv.writer(out).writerow([event_id, "2026.11.06 12:00:00", "2026.11.06 10:00:00", "BROKER_SERVER_AND_PC_UTC", event, "XAUUSD", "123", reason, details])
+    csv.writer(out).writerow([event_id, "2026.11.06 12:00:00", "2026.11.06 10:00:00", "BROKER_SERVER_AND_PC_UTC", event, symbol, "123", reason, details])
     return out.getvalue().encode("cp1252")
 
 
@@ -331,6 +331,23 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("posisi terkonfirmasi +1", self.sent[0])
         self.assertIn("posisi tertutup +1", self.sent[0])
         self.assertIn("Net tertutup kumulatif=45.50 USD", self.sent[0])
+
+    def test_signal_notification_for_buy_and_sell_and_hold_silent(self):
+        n = self.notifier()
+        n.poll()
+        # HOLD should be silent
+        self.append(audit(event="SIGNAL", details="GS_HOLD model=GS_BASELINE close=75900.0 fast=75800.0 slow=75700.0 rsi=50.0 atr=80.0", reason="HOLD_SPREAD_LIMIT", symbol="BTCUSDm"))
+        n.poll()
+        self.assertEqual(self.sent, [])
+        # BUY signal should notify
+        self.append(audit(event="SIGNAL", details="GS_BUY model=GS_BASELINE close=75944.38 fast=75860.74 slow=75837.35 rsi=57.52 atr=84.56", reason="CANDIDATE_BASELINE_EMA_RSI", symbol="BTCUSDm"))
+        n.poll()
+        self.assertEqual(len(self.sent), 1)
+        self.assertIn("Sinyal BUY terdeteksi", self.sent[0])
+        self.assertIn("BTCUSDm", self.sent[0])
+        self.assertIn("CANDIDATE_BASELINE_EMA_RSI", self.sent[0])
+        self.assertIn("Harga: 75944.38", self.sent[0])
+        self.assertIn("RSI: 57.52", self.sent[0])
 
 
 if __name__ == "__main__":
