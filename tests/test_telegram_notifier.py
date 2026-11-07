@@ -319,6 +319,19 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("Riwayat pulih", self.sent[-1])
         self.assertNotIn("posisi terkonfirmasi +", self.sent[-1])
 
+    def test_btcusd_crypto_symbol_notifications(self):
+        self.snapshot(filled=1, opened=1, symbol="BTCUSDm")
+        n = self.notifier()
+        n.poll()
+        self.assertEqual(self.sent, [])
+        self.snapshot(filled=2, closed=1, net="45.50", opened=1, symbol="BTCUSDm")
+        n.poll()
+        self.assertEqual(len(self.sent), 1)
+        self.assertIn("BTCUSDm", self.sent[0])
+        self.assertIn("posisi terkonfirmasi +1", self.sent[0])
+        self.assertIn("posisi tertutup +1", self.sent[0])
+        self.assertIn("Net tertutup kumulatif=45.50 USD", self.sent[0])
+
 
 if __name__ == "__main__":
     unittest.main()

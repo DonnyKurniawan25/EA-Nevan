@@ -50,7 +50,7 @@ def audit_message(row):
         return None, None
     # Discard arbitrary text; only exact reason constants and numeric detail keys.
     reason = item["reason_code"] if item["reason_code"] in REASONS else "OTHER_REASON_REDACTED"
-    symbol = item["symbol"] if re.fullmatch(r"XAUUSD[A-Za-z0-9._-]{0,8}", item["symbol"]) else "[symbol redacted]"
+    symbol = item["symbol"] if re.fullmatch(r"(?:XAUUSD|BTCUSD)[A-Za-z0-9._-]{0,8}", item["symbol"]) else "[symbol redacted]"
     values = []
     for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
         values.append(key + "=" + value)
@@ -70,7 +70,7 @@ def snapshot_data(path):
     item = dict(zip(SNAPSHOT_HEADER, rows[1][1]))
     if item["account_mode"] != "DEMO" or item["trial_status"] not in TRIAL_STATES:
         return None
-    if not re.fullmatch(r"XAUUSD[A-Za-z0-9._-]{0,8}", item["symbol"]) or not re.fullmatch(r"[A-Z]{3}", item["currency"]):
+    if not re.fullmatch(r"(?:XAUUSD|BTCUSD)[A-Za-z0-9._-]{0,8}", item["symbol"]) or not re.fullmatch(r"[A-Z]{3}", item["currency"]):
         return None
     for key in ("limit", "entry_submissions", "filled_positions", "closed_positions", "wins", "losses", "open_positions"):
         if not re.fullmatch(r"[0-9]{1,8}", item[key]):
