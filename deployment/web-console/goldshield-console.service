@@ -1,0 +1,49 @@
+[Unit]
+Description=Private GoldShield phone desktop console
+After=network.target
+
+[Service]
+Type=simple
+User=goldshield-console
+Group=goldshield-console
+WorkingDirectory=/home/ubuntu/EA-Nevan
+Environment=GOLDSHIELD_CONSOLE_ORIGIN=https://api.nevstore.id:8443
+Environment=GOLDSHIELD_CONSOLE_PORT=6091
+Environment=GOLDSHIELD_CONSOLE_STATE=/var/lib/goldshield-console
+Environment=GOLDSHIELD_CONSOLE_NOVNC=/opt/goldshield-console/noVNC
+Environment=GOLDSHIELD_CONSOLE_STATIC=/home/ubuntu/EA-Nevan/deployment/web-console/static
+Environment=GOLDSHIELD_CONSOLE_VNC_PASSWORD_FILE=%d/vnc-password
+LoadCredential=vnc-password:/etc/goldshield/console-vnc.password
+ExecStart=/opt/goldshield-console/venv/bin/python /home/ubuntu/EA-Nevan/tools/web_console.py serve
+StateDirectory=goldshield-console
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/goldshield-console
+InaccessiblePaths=-/home/ubuntu/.mt5 -/home/ubuntu/goldshield-linux -/etc/goldshield
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryHigh=128M
+MemoryMax=192M
+CPUQuota=25%
+TasksMax=32
+LimitNOFILE=256
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
