@@ -43,6 +43,14 @@ Run `/home/ubuntu/goldshield-linux/test-venv/bin/python -m unittest discover -s 
 - Suite gabungan saat deployment: 50 tes Python (3 installer Windows dilewati) dan 8 tes UI JavaScript, tanpa kegagalan. Review independen source/security lulus.
 - EA tetap pada mode SETUP, unit trading aktif OFF dan sentinel aktivasi tidak dibuat. Login broker oleh pemilik serta impor state sesi PC tetap tahap terpisah.
 
+## Pemulihan koneksi HP yang tersendat
+
+Shell dan pertukaran credential tetap pada origin terisolasi `https://api.nevstore.id:8443`. Transport desktop menggunakan `wss://api.nevstore.id/ea-console/ws` pada TLS standar 443. Pasang `nginx-websocket443.conf` di dalam server HTTPS API: hanya endpoint WebSocket itu yang diproxy; path console lain pada 443 mengembalikan 404. Cookie tetap same-site dan backend tetap memerlukan Origin UI **:8443**; perubahan ini tidak mengizinkan halaman biasa port 443 mengendalikan desktop.
+
+Koneksi frontend dibatasi 20 detik untuk fetch, pemuatan modul dan handshake. Jika belum berhasil, request dibatalkan, koneksi lama dihentikan dan tombol Sambungkan ulang dibuka tanpa mencabut sesi. Callback terlambat dari attempt lama tidak boleh mengubah koneksi baru. Indikator membedakan Memuat layar dari Menyambungkan, dan status tersambung menjelaskan letak File → Login to Trade Account. Penyebab khusus di perangkat/jaringan pengguna tidak disimpulkan dari screenshot saja.
+
+Saat debugging sesi pengguna yang masih valid, jangan membuat tiket baru sekadar untuk mengetes: itu akan mencabut sesi pengguna. Uji transport tanpa credential asli, gunakan fixtures terisolasi, dan minta refresh halaman yang sudah terbuka, bukan membuka ulang fragment sekali pakai. HTTP 200 pada shell bukan bukti WebSocket tersambung.
+
 ## Mengirim ulang akses privat
 
 Sebagai root, jalankan `python3 /home/ubuntu/EA-Nevan/tools/send_console_link.py`. Helper memeriksa tujuan chat pribadi pemilik, membuat capability baru, mengirim tombol terlindungi dan memverifikasi readback pesan/tombol. Stdout hanya receipt ID/waktu kedaluwarsa, tanpa link atau credential. Capability baru mencabut seluruh link/sesi pemilik sebelumnya. Jangan menjalankan CLI issue-ticket dengan stdout terbuka di chat, menyalin link ke grup, atau menguji ulang link milik pengguna. Link harus dibuka dalam 15 menit; sesi berlaku 30 menit setelah pertukaran berhasil. Jangan meminta password broker melalui bot atau Telegram.

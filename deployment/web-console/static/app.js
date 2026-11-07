@@ -41,7 +41,8 @@ export function consumeTicket(location, history) {
 }
 export function websocketURL(base) {
   const url = new URL('/ea-console/ws', base);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (url.protocol === 'https:') { url.protocol = 'wss:'; url.port = ''; }
+  else url.protocol = 'ws:';
   return url.href;
 }
 
@@ -53,6 +54,7 @@ export async function boot(env = globalThis) {
   const screen = el('screen'), input = el('phone-input');
   let rfb = null, expires = 0, busy = false, closed = false, generation = 0, zoomed = false;
   let timer;
+  let cancelConnection = () => {};
   const connected = () => screen.dataset.status === 'true';
   const status = (title, message, live = false) => {
     el('status').textContent = title;
@@ -68,7 +70,7 @@ export async function boot(env = globalThis) {
     if (rfb) rfb.focusOnClick = true;
   };
   const stop = () => {
-    generation++; hideKeyboard();
+    generation++; cancelConnection(); hideKeyboard();
     const current = rfb; rfb = null;
     if (current) current.disconnect();
     screen.dataset.status = 'false';
@@ -125,22 +127,40 @@ export async function boot(env = globalThis) {
     if (busy || closed) return;
     busy = true; stop(); const attempt = generation;
     el('reconnect').disabled = true;
-    status('Menyambungkan', 'Menghubungkan desktop server…');
+    status('Menyambungkan', 'Memeriksa akses desktop privat…');
     let connection;
+    const controller = new AbortController();
+    const deadline = env.setTimeout(() => {
+      if (closed || attempt !== generation || connected()) return;
+      stop(); busy = false;
+      status('Koneksi tertunda', 'Layar belum tersambung. Tekan Sambungkan ulang atau muat ulang halaman ini.');
+      el('reconnect').disabled = false;
+    }, 20000);
+    cancelConnection = () => {
+      env.clearTimeout(deadline); controller.abort();
+      if (connection) connection.password = '';
+      connection = null;
+    };
     try {
-      connection = await request('connection', {method:'POST'}); setExpiry(connection.expires_at);
+      connection = await request('connection', {method:'POST', signal:controller.signal});
+      if (closed || attempt !== generation) return;
+      setExpiry(connection.expires_at);
+      status('Memuat layar', 'Memuat komponen desktop privat…');
       const {default:RFB} = env.loadRFB ? await env.loadRFB() : await import('./vendor/core/rfb.js');
       if (closed || attempt !== generation) return;
+      status('Menyambungkan', 'Membuka koneksi layar MT5…');
       rfb = new RFB(screen, websocketURL(env.location.href), {credentials:{password:connection.password}, shared:true});
       connection.password = ''; connection = null;
       rfb.resizeSession = false; rfb.focusOnClick = true; applyZoom();
       rfb.addEventListener('connect', () => {
         if (closed || attempt !== generation) return;
-        status('Terhubung', 'Desktop siap. Gunakan akun demo saja.', true);
+        cancelConnection();
+        status('Terhubung', 'Login: klik File di kiri atas layar MT5 → Login to Trade Account.', true);
         el('reconnect').disabled = false;
       });
       rfb.addEventListener('disconnect', () => {
         if (closed || attempt !== generation) return;
+        cancelConnection();
         hideKeyboard(); status('Terputus', 'Koneksi terputus. Sambungkan ulang selama sesi masih aktif.');
         el('reconnect').disabled = false;
       });
@@ -149,11 +169,13 @@ export async function boot(env = globalThis) {
       });
     } catch (error) {
       if (closed || attempt !== generation) return;
+      cancelConnection();
       if (error.status === 401 || error.status === 403) expired();
       else { status('Belum terhubung', 'Server belum dapat dihubungi. Coba sambungkan ulang.'); el('reconnect').disabled = false; }
     } finally {
       if (connection) connection.password = '';
-      connection = null; busy = false;
+      connection = null;
+      if (attempt === generation) busy = false;
     }
   };
   el('reconnect').addEventListener('click', connect);

@@ -10,23 +10,51 @@ function fixture({hash='',denied=false}={}) {
   setAttribute(k,v){this[k]=v} blur(){} focus(){} async emit(type){await Promise.all((this.handlers[type]||[]).map(fn=>fn({preventDefault(){}})))}
  }
  const ids=['screen','phone-input','status','message','remaining','phone-keyboard','keyboard-toggle','zoom','reconnect','logout'];
- const nodes=Object.fromEntries(ids.map(id=>[id,new Element()]));const calls=[],rfbs=[];let interval;
+ const nodes=Object.fromEntries(ids.map(id=>[id,new Element()]));const calls=[],rfbs=[],timeouts=new Map();let interval,nextTimeout=0;
  const env={location:{hash,pathname:'/ea-console/',search:'',href:'https://api.nevstore.id:8443/ea-console/'+hash},history:{replaceState(){calls.push('scrub')}},document:{getElementById:id=>nodes[id],body:{dataset:{}},querySelectorAll:()=>[]},
  fetch:async(url,options)=>{calls.push({url,options});return {ok:!denied,status:denied?401:200,json:async()=>url.endsWith('connection')?{password:'synthetic-vnc-only',expires_at:Date.now()+60000}:{expires_at:Date.now()+60000}}},
+ setTimeout(fn){const id=++nextTimeout;timeouts.set(id,fn);return id},clearTimeout(id){timeouts.delete(id)},
  setInterval(fn){interval=fn;return 1},clearInterval(){},loadRFB:async()=>({default:class extends Element{constructor(screen,url,options){super();this.url=url;this.options=options;rfbs.push(this)}disconnect(){this.stopped=true}sendKey(){} }} )};
- return {env,nodes,calls,rfbs,tick:()=>interval?.()};
+ return {env,nodes,calls,rfbs,tick:()=>interval?.(),connectionTimeout:()=>{const list=[...timeouts.values()];timeouts.clear();list.forEach(fn=>fn())}};
 }
 test('one-use exchange precedes private connection; reconnect uses cookie; logout disconnects',async()=>{
  const {boot}=await load();const f=fixture({hash:'#ticket='+'t'.repeat(43)});await boot(f.env);
  assert.equal(f.calls[0],'scrub');const api=f.calls.filter(c=>c.url);assert.deepEqual(api.map(c=>c.url),['./api/session','./api/connection']);
  assert.equal(api[0].options.method,'POST');assert.equal(api[0].options.headers['X-EA-Console'],'1');assert.equal(api[0].options.credentials,'same-origin');
  assert.equal(api[1].options.method,'POST','credential request must use POST so a real browser sends Origin');
- assert.equal(f.rfbs[0].url,'wss://api.nevstore.id:8443/ea-console/ws');assert.equal(f.rfbs[0].resizeSession,false);assert.equal(f.rfbs[0].scaleViewport,true);
+ assert.equal(f.rfbs[0].url,'wss://api.nevstore.id/ea-console/ws');assert.equal(f.rfbs[0].resizeSession,false);assert.equal(f.rfbs[0].scaleViewport,true);
  await f.rfbs[0].emit('connect');assert.equal(f.nodes.screen.dataset.status,'true');
  await f.nodes.zoom.emit('click');assert.equal(f.rfbs[0].clipViewport,true);assert.equal(f.rfbs[0].dragViewport,true);
  await f.nodes.reconnect.emit('click');assert.equal(f.calls.filter(c=>c.url==='./api/session').length,1);
  await f.nodes.logout.emit('click');assert.equal(f.nodes.screen.dataset.status,'false');assert.ok(f.rfbs.at(-1).stopped);assert.equal(f.calls.at(-1).url,'./api/logout');assert.equal(f.calls.at(-1).options.method,'POST');
  assert.doesNotMatch(JSON.stringify(f.nodes),/synthetic-vnc-only|tttttttttttt/);
+});
+test('stalled desktop handshake times out and retries without replacing user session',async()=>{
+ const {boot}=await load();const f=fixture();await boot(f.env);
+ assert.equal(f.nodes.reconnect.disabled,true);
+ f.connectionTimeout();
+ assert.equal(f.nodes.status.textContent,'Koneksi tertunda');
+ assert.equal(f.nodes.reconnect.disabled,false);
+ assert.equal(f.rfbs[0].stopped,true);
+ assert.ok(f.calls.find(c=>c.url==='./api/connection').options.signal.aborted);
+ await f.rfbs[0].emit('connect');assert.equal(f.nodes.screen.dataset.status,'false');
+ await f.nodes.reconnect.emit('click');
+ assert.equal(f.calls.filter(c=>c.url==='./api/session').length,1);
+ assert.equal(f.rfbs.length,2);
+ await f.rfbs[1].emit('connect');
+ assert.equal(f.nodes.status.textContent,'Terhubung');
+});
+test('late module import after timeout cannot replace a successful retry',async()=>{
+ const {boot}=await load();const f=fixture();const loader=f.env.loadRFB;let release;
+ f.env.loadRFB=()=>new Promise(resolve=>{release=resolve});
+ const pending=boot(f.env);await new Promise(setImmediate);
+ assert.equal(f.nodes.status.textContent,'Memuat layar');
+ f.connectionTimeout();assert.equal(f.nodes.reconnect.disabled,false);
+ f.env.loadRFB=loader;await f.nodes.reconnect.emit('click');
+ release(await loader());await pending;
+ assert.equal(f.rfbs.length,1);
+ await f.rfbs[0].emit('connect');f.connectionTimeout();
+ assert.equal(f.nodes.status.textContent,'Terhubung');
 });
 test('expiry clears input and disconnects without a further request',async()=>{
  const {boot}=await load();const f=fixture();await boot(f.env);await f.rfbs[0].emit('connect');f.nodes['phone-input'].value='synthetic-draft';
@@ -61,6 +89,10 @@ test('phone input clears immediately, IME commits once, deletion and Enter do no
  fire('keydown',{key:'Backspace'});fire('keydown',{key:'Enter'});assert.deepEqual(sent.slice(-2),[0xff08,0xff0d]);
  fire('beforeinput',{inputType:'deleteContentBackward'});assert.equal(sent.at(-1),0xff08);
 });
+test('desktop WebSocket uses standard TLS port without capability query', async () => {
+ const {websocketURL} = await load();
+ assert.equal(websocketURL('https://api.nevstore.id:8443/ea-console/?x=1#private'),'wss://api.nevstore.id/ea-console/ws');
+});
 test('Unicode, Latin1, newline and control key conversion', async () => {
  const {textKeysyms,controlKeysyms} = await load();
  assert.equal(typeof textKeysyms,'function');
@@ -76,5 +108,5 @@ test('ticket removed synchronously before any network, strict one-use format', a
  assert.equal(consumeTicket(loc, {replaceState(...args){events.push(args)}}), ticket);
  assert.deepEqual(events, [[null,'','/ea-console/']]);
  for(const hash of ['#abc','#ticket=short','#ticket='+ticket+'&x=1','#ticket='+ticket+'!']) assert.equal(consumeTicket({...loc,hash},{replaceState(){}}),null);
- assert.equal(websocketURL('https://api.nevstore.id:8443/ea-console/?secret=no#bad'),'wss://api.nevstore.id:8443/ea-console/ws');
+ assert.equal(websocketURL('https://api.nevstore.id:8443/ea-console/?secret=no#bad'),'wss://api.nevstore.id/ea-console/ws');
 });
