@@ -76,7 +76,7 @@ test('session UI contract, private assets and no persistent sensitive channels',
  assert.match(source,/export async function boot/);
  assert.doesNotMatch(source,/localStorage|sessionStorage|console\.(log|debug)|clipboardPasteFrom|sendCtrlAltDel/);
  const html=await readFile(new URL('../deployment/web-console/static/index.html',import.meta.url),'utf8');
- assert.match(html,/Trading OFF — login demo saja/);assert.match(html,/type="password"/);assert.doesNotMatch(html,/<form|<input[^>]*\sname="/);
+ assert.match(html,/Khusus DEMO — status trading lihat di MT5/);assert.match(html,/type="password"/);assert.doesNotMatch(html,/<form|<input[^>]*\sname="/);
  assert.match(source,/X-EA-Console/);assert.match(source,/credentials: 'same-origin'/);assert.match(source,/\.\/vendor\/core\/rfb.js/);assert.match(source,/resizeSession = false/);assert.match(source,/clipViewport/);
 });
 test('phone input clears immediately, IME commits once, deletion and Enter do not duplicate', async () => {

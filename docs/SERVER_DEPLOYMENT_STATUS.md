@@ -1,59 +1,55 @@
 # Deployment server — GoldShield DEMO20
 
-Verifikasi awal: 6 November 2026 (UTC). Ini status bootstrap server, bukan bukti strategi menguntungkan atau acceptance trading.
+Terakhir diverifikasi: **7 November 2026, 03:33 UTC**. Status operasi DEMO, bukan bukti profitabilitas atau kelayakan akun real.
 
-## Yang sudah dijalankan
+## Jalur yang dipilih operator
 
-- Repository di `/home/ubuntu/EA-Nevan`; runtime hasil verifikasi manifest di `/home/ubuntu/goldshield-linux`.
-- Ubuntu 24.04 x86_64; WineHQ staging 11.21; terminal MT5 x64 build 6305.
-- MT5 dijalankan sebagai user `ubuntu`, prefix `/home/ubuntu/.mt5`, mode `/portable`.
-- Desktop privat TigerVNC `:1` hanya mendengarkan `127.0.0.1:5901` dan `[::1]:5901` dengan VNC authentication. Tidak ada port VNC publik yang dibuka.
-- `goldshield-desktop.service` milik user `ubuntu` aktif dan enabled; linger aktif.
-- `goldshield-mt5-setup.service` aktif hanya untuk login/setup. Start config `SETUP.ini`: Experts OFF, AllowLiveTrading OFF, DLL OFF. Layanan setup belum enabled saat boot.
-- Layanan `goldshield-mt5.service` untuk sesi aktif tetap disabled. File `ACTIVATE_DEMO20` dan receipt impor belum dibuat.
-- Binary DEMO20 dan dua preset disalin ke folder MT5 dengan hash sama persis dengan manifest. Tidak ada algoritma atau preset trading yang diubah.
-- Tes Python baseline: 21 kasus ditemukan, 18 lulus, 3 installer Windows dilewati di Linux. Tes matematika C++ memakai `.mqh` asli: 40.055 assertions lulus. Ini bukan uji fill/disconnect broker atau backtest profitabilitas.
-- Layanan yang sudah ada tidak dihentikan untuk deployment. Container tetap Up; pemeriksaan HTTPS Nevstore dan Boost menghasilkan HTTP 200 setelah bootstrap.
+Operator membatalkan migrasi PC dan memilih **sesi DEMO baru di server**, setelah menyatakan EA PC dinonaktifkan. Sesi server menggunakan Magic/namespace baru; state lama tidak dihapus atau direset. Receipt impor PC tidak dibuat. Panduan migrasi tetap tersedia untuk migrasi yang memang disetujui, bukan syarat sesi baru ini.
 
-## Belum diverifikasi / penghalang aktivasi
+- Repo: `/home/ubuntu/EA-Nevan`.
+- Sesi privat: `/home/ubuntu/goldshield-server-demo/server-20261107`.
+- MT5 berjalan sebagai `ubuntu`, prefix `/home/ubuntu/.mt5`, `/portable`, display `:1`.
+- Akun dipilih lewat konfigurasi privat dari preflight native yang tervalidasi; password tersimpan MT5 tidak diekstrak.
 
-1. Login ke akun DEMO Exness yang benar, dilakukan operator secara privat. Tidak ada password broker dalam Git atau template runtime.
-2. Sesi di PC harus flat, Algo Trading OFF, MT5 ditutup. Snapshot asli `DEMO20-STATE-...` harus diekspor sesuai panduan, bukan membuat ulang counter.
-3. Impor snapshot dan cocokkan prefix, reference, used counter, limit 20, akun, simbol, dan posisi pada STAGE.
-4. Baru setelah pemeriksaan operator lengkap, aktivasi demo dan layanan autostart trading boleh dilakukan. Tidak pernah memakai akun real.
-5. Belum ada uji order broker di server, restart broker/disconnect, atau reboot host. Jangan menganggap layanan proses aktif sebagai EA siap trading.
+## Bukti operasi aktual
 
-## Notifikasi dan verifikasi tambahan
+- Native preflight membuktikan koneksi DEMO, USD, hedging, `Exness-MT5Trial7`, `XAUUSDm`, akun flat, history tersedia, Magic belum terpakai dan namespace belum ada **sebelum inisialisasi**.
+- STAGE tanpa order membuat reference/counter/schema secara alami lewat EA asli. Native terminal trading flag **0**, kedua schema **1**, counter **0/20**, posisi/order **0/0**, block/pending **0**. Receipt genuine dibuat verifier.
+- Setelah shutdown normal STAGE, identitas berkas persisten dan state tetap terjaga. Tidak ada globals, lock, counter atau reference yang direkayasa.
+- RUN terpisah `goldshield-server-demo.service` sudah **active/running dan enabled**. Native terminal trading flag **1**; dialog properti EA yang sedang terpasang menunjukkan **Allow Algo Trading dicentang**. Input aktual menunjukkan `EnableAutoTrading=true`, `DemoTradingOptIn=true`, `AllowRealTrading=false`, mode `RULES_DEMO`; properti EA mengonfirmasi `XAUUSDm,M15`.
+- Restart aplikasi melalui systemd benar-benar dijalankan. PID berubah; bukti native sesudah restart tetap cocok untuk akun, broker, simbol, Magic, namespace, reference, counter **0/20** dan cap **20**. Device/inode berkas persisten tetap sama; posisi/order tetap **0/0**, block/pending **0**.
+- Satu chart pada profil milik sesi; launcher hanya mengarsipkan profil UI milik sesi, tidak menghapus state trading.
+- Unit memakai bounded `Restart=always`; desktop user service aktif, linger aktif. Autostart dikonfigurasi; host tidak direboot untuk pengujian.
+- Status core terakhir **SAFE_MODE / STALE_TICK_OR_SERVER_CLOCK**. EA aktif tetapi belum mengirim order; perlindungan harga/waktu tidak dilemahkan dan sinyal tidak dipaksakan.
 
-- Observer Telegram terpisah dipasang sebagai sistem service `goldshield-notifier.service`, user `ubuntu`, writable hanya `/var/lib/goldshield-notifier`; kredensial tetap di luar Git dan tidak dicetak.
-- Unit enabled tetapi **sengaja inactive** karena receipt state PC belum ada. Pemeriksaan `ConditionResult=no` terkonfirmasi. Setelah impor/STAGE, mulai observer untuk baseline sebelum aktivasi demo; jangan membuat receipt palsu.
-- Self-test nyata berlabel BUKAN TRANSAKSI diterima di topik yang ditentukan operator. Exact target chat/thread/message diperiksa kembali. Ini tes transport, bukan bukti order broker.
-- Suite final: 36 kasus Python ditemukan; 3 installer Windows dilewati. Seluruh kasus yang dijalankan lulus, termasuk 15 kasus notifier. Regression mencakup anti-spam saat history unavailable, Bahasa Indonesia, dan kewajiban ACK chat/topic yang benar.
-- Tidak ada akun demo/login, frozen state, atau order broker yang diuji. Trading tetap OFF dan algoritme/binary/preset tetap identik.
+## Batas pilot dan pemantauan
 
-## Akses desktop dari PC operator
+- DEMO saja; hard rejection akun real tetap dipertahankan.
+- Lot `0.01`, total lot akun maksimal `0.01`, satu posisi, tiga entry/hari, maksimal **20 entry submissions**. Submission gagal tetap memakai slot; restart tidak mengisi ulang kuota.
+- Sumber/algoritme, binary EX5 stok, dan preset dasar tetap identik. Preset turunan privat hanya membedakan identitas sesi dan opt-in tahap STAGE/RUN sesuai guard.
+- `goldshield-notifier.service` aktif/enabled; gate memakai receipt STAGE sesi baru, bukan receipt migrasi. Cursor terpisah dibaseline dari audit/snapshot aktual **sebelum** marker aktivasi dibuat. Kredensial Telegram di luar Git.
+- Tujuan notifikasi mengikuti grup/topik yang sudah diverifikasi. Self-test transport terdahulu berlabel BUKAN TRANSAKSI; bukan bukti order. Observer tidak mengeksekusi BUY/SELL.
+- Banner konsol dan pesan akses bersifat netral terhadap fase: status Algo Trading dilihat di MT5/konfirmasi topik, bukan klaim statis Trading OFF.
 
-Password VNC awal dibuat acak di server dan tidak dikirim ke chat. Operator menetapkan password sendiri melalui SSH:
+## Pengujian dan batas verifikasi
 
-```bash
-sudo -u ubuntu tigervncpasswd
-```
-
-Perubahan password perlu dimuat ulang oleh desktop. Koordinasikan dengan pendamping operator untuk me-restart **hanya layanan desktop dan setup GoldShield** selagi belum ada trading/posisi. Jangan mematikan desktop trading aktif untuk mengganti password tanpa pemeriksaan posisi dan jadwal.
-
-Buka tunnel SSH dari PC, ganti `SERVER_ANDA` dengan host SSH yang biasa dipakai:
-
-```powershell
-ssh -N -L 127.0.0.1:5901:127.0.0.1:5901 SERVER_ANDA
-```
-
-TigerVNC Viewer: `127.0.0.1::5901`. Login broker dilakukan langsung pada MT5 server; tidak melalui grup Telegram. Menutup Viewer/tunnel bukan logout desktop.
+- Suite terbaru: **72 tes Python, OK dengan 3 skip installer Windows**, serta **11 tes UI Node lulus**.
+- Safety-math C++ memakai `.mqh` asli: **40.055 assertions lulus**. Ini bukan backtest profitabilitas.
+- Observer native dikompilasi dengan MetaEditor aktual: **0 errors, 0 warnings**, EX5 hasil compile benar-benar ada. CLI exit code saja tidak dipakai sebagai bukti.
+- Review independen jalur sesi baru, profil, binding akun dan perbaikan global-off STAGE: SPEC PASS lalu kualitas approved.
+- **Belum ada order/fill/close broker dari sesi ini**, hasil forward-test bermakna, pengujian disconnect broker, atau reboot host. Uptime dan izin ON tidak membuktikan order sukses atau strategi menguntungkan.
+- Evaluasi DEMO mengikuti `docs/DEMO_VALIDATION_PROTOCOL.md`; trading tidak melatih bobot ML otomatis dan 20 submission bukan sertifikasi statistik. Akun real memerlukan keputusan terpisah.
 
 ## Perintah status melalui SSH root
 
 ```bash
 sudo -u ubuntu env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
-  systemctl --user status goldshield-desktop.service goldshield-mt5-setup.service goldshield-mt5.service --no-pager
+  systemctl --user status goldshield-desktop.service goldshield-server-demo.service --no-pager
+systemctl status goldshield-notifier.service --no-pager
 ```
 
-Panduan migrasi lengkap tetap `deployment/linux-guide/PANDUAN_SERVER_LINUX.md`. Jangan melewati alur impor hanya karena binary sudah dipasang. Notifikasi eksternal didokumentasikan terpisah; `TelegramEnabled` di EA tidak diaktifkan.
+Untuk maintenance, periksa posisi/order dahulu. Menghentikan Algo Trading juga menghentikan close/modify oleh EA, bukan hanya entry; SL/TP broker tetap berlaku dan menutup MT5 tidak menutup posisi.
+
+Akses HP melalui tombol konsol privat sekali pakai; jangan bagikan link atau kredensial. Menutup browser/HP tidak menghentikan MT5 server. TigerVNC tetap loopback-only; jangan membuka port VNC publik. Password broker hanya diisi operator langsung di MT5, bukan dalam chat atau Git.
+
+Prosedur sesi baru: `docs/NEW_SERVER_DEMO_SESSION.md`. Jalur migrasi lama tetap terpisah di `deployment/linux-guide/PANDUAN_SERVER_LINUX.md`; jangan menggunakannya untuk memalsukan atau mereset sesi baru.

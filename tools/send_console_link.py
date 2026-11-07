@@ -8,9 +8,10 @@ MESSAGE = (
     '🔒 Akses privat MT5 Server\n\n'
     'Tautan sekali pakai: buka dalam 15 menit. Sesi desktop berlaku 30 menit setelah dibuka. '
     'Jangan teruskan tautan ini.\n\n'
-    'Di layar MT5 pilih File → Login to Trade Account, lalu masukkan nomor akun DEMO, '
-    'password trading, dan server akun Anda langsung di MT5—bukan di chat. '
-    'Biarkan Algo Trading OFF.\n\n'
+    'Untuk login awal, pilih File → Login to Trade Account di layar MT5, lalu masukkan akun DEMO, '
+    'password trading, dan server langsung di MT5—bukan di chat. '
+    'Untuk pemantauan, lihat panel EA. Ikuti status Algo Trading yang dikonfirmasi di topik; '
+    'jangan ubah pengaturan EA tanpa koordinasi.\n\n'
     'Miringkan HP agar layar lebih luas. Gunakan tombol Keyboard untuk mengetik, '
     'dan Tutup akses setelah selesai. Menutup akses browser tidak mematikan MT5.'
 )

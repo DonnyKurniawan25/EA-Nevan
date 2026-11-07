@@ -1,0 +1,25 @@
+[Unit]
+Description=GoldShield separate NEW server DEMO20 session
+Requires=goldshield-desktop.service
+After=goldshield-desktop.service
+Conflicts=goldshield-mt5-setup.service goldshield-mt5.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+Environment=WINEPREFIX=%h/.mt5
+Environment=DISPLAY=:1
+# Supply GOLDSHIELD_SESSION_DIR explicitly in an operator-owned drop-in.
+ExecStart=/usr/bin/python3 %h/EA-Nevan/tools/new_server_session.py launch --session-dir ${GOLDSHIELD_SESSION_DIR} --mode run
+Restart=always
+RestartSec=20
+MemoryHigh=1400M
+MemoryMax=1800M
+CPUQuota=100%
+TasksMax=512
+TimeoutStopSec=60
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

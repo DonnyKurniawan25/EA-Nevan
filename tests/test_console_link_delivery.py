@@ -40,6 +40,11 @@ class PrivateLinkDeliveryTests(unittest.TestCase):
         self.assertEqual(result, {'chat_id': '1227557858', 'message_id': 9, 'expires_at': 1900000000})
         self.assertNotIn(ticket, repr(result))
 
+    def test_access_instructions_do_not_claim_active_sessions_are_trading_off(self):
+        module = self.load()
+        self.assertNotIn('Biarkan Algo Trading OFF.', module.MESSAGE)
+        self.assertIn('Ikuti status Algo Trading', module.MESSAGE)
+
     def test_main_redacts_provider_errors(self):
         import io
         from contextlib import redirect_stdout, redirect_stderr
