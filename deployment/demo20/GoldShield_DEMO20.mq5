@@ -24,7 +24,7 @@ GSOrderExecutor g_executor;
 GSOwnedPosition g_owned;
 bool g_initialized=false,g_processing=false,g_had_position=false;
 bool g_runtime_block=false,g_runtime_hard_block=false;
-datetime g_observed_bar=0;
+datetime g_observed_bar=0,g_observed_exit_bar=0;
 datetime g_research_first=0;
 long g_login=0;
 string g_server="",g_signal="HOLD_STARTUP";
@@ -102,11 +102,101 @@ void GSProcess(const bool evaluate_signal)
             if(TimeTradeServer()-opened>=MaxHoldMinutes*60 && profit>0.0)
               {
                string close_reason="";
-               if(g_executor.ClosePosition(t,g_risk,g_log,close_reason))
+               if(g_executor.ClosePosition(t,g_risk,g_log,close_reason,"TIME_EXIT_PROFIT"))
                  {
                   g_log.Event("TIME_PROFIT_EXIT","HOLD_DURATION_TARGET_UNREACHED",
                               StringFormat("ticket=%I64u profit=%.2f hold_sec=%I64d",
                               t,profit,(long)(TimeTradeServer()-opened)));
+                 }
+              }
+           }
+        }
+     }
+
+   // Rule 2: Break-Even Protection (Kunci Modal)
+   if(UseBreakEvenProtection && g_owned.count>0)
+     {
+      for(int i=PositionsTotal()-1;i>=0;i--)
+        {
+         ulong t=PositionGetTicket(i);
+         if(t==0 || !PositionSelectByTicket(t)) continue;
+         if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+           {
+            ENUM_POSITION_TYPE p_type=(ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+            double open_price=PositionGetDouble(POSITION_PRICE_OPEN);
+            double current_sl=PositionGetDouble(POSITION_SL);
+            double current_tp=PositionGetDouble(POSITION_TP);
+            double current_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+            MqlTick p_tick;
+            if(SymbolInfoTick(TradeSymbol,p_tick))
+              {
+               double point=SymbolInfoDouble(TradeSymbol,SYMBOL_POINT);
+               double spread=SymbolInfoInteger(TradeSymbol,SYMBOL_SPREAD)*point;
+               if(p_type==POSITION_TYPE_BUY)
+                 {
+                  if(p_tick.bid>=open_price+spread*2.0 && current_profit>0.50 && current_sl<open_price)
+                    {
+                     double new_sl=open_price+point;
+                     string mod_reason="";
+                     g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason);
+                    }
+                 }
+               else if(p_type==POSITION_TYPE_SELL)
+                 {
+                  if(p_tick.ask<=open_price-spread*2.0 && current_profit>0.50 && (current_sl>open_price || current_sl==0.0))
+                    {
+                     double new_sl=open_price-point;
+                     string mod_reason="";
+                     g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason);
+                    }
+                 }
+              }
+           }
+        }
+     }
+
+   // Rule 3: Early Reversal Exit (Deteksi "bakalan minus" dari closed bar M15)
+   datetime current_bar=iTime(TradeSymbol,SignalTimeframe,0);
+   if(UseEarlyReversalExit && g_owned.count>0 && current_bar>0 && current_bar!=g_observed_exit_bar)
+     {
+      g_observed_exit_bar=current_bar;
+      GSMarketSnapshot data;
+      string m_reason="";
+      if(g_market.Read(MinClosedBars,data,m_reason))
+        {
+         for(int i=PositionsTotal()-1;i>=0;i--)
+           {
+            ulong t=PositionGetTicket(i);
+            if(t==0 || !PositionSelectByTicket(t)) continue;
+            if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+              {
+               ENUM_POSITION_TYPE p_type=(ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+               bool should_exit_early=false;
+               string exit_detail="";
+               if(p_type==POSITION_TYPE_BUY)
+                 {
+                  if(data.bar.close<data.fast_ema || data.rsi<45.0)
+                    {
+                     should_exit_early=true;
+                     exit_detail=StringFormat("BUY_REVERSAL close=%.2f ema=%.2f rsi=%.2f",data.bar.close,data.fast_ema,data.rsi);
+                    }
+                 }
+               else if(p_type==POSITION_TYPE_SELL)
+                 {
+                  if(data.bar.close>data.fast_ema || data.rsi>55.0)
+                    {
+                     should_exit_early=true;
+                     exit_detail=StringFormat("SELL_REVERSAL close=%.2f ema=%.2f rsi=%.2f",data.bar.close,data.fast_ema,data.rsi);
+                    }
+                 }
+               if(should_exit_early)
+                 {
+                  string c_reason="";
+                  if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"EARLY_REVERSAL_EXIT"))
+                    {
+                     g_log.Event("EARLY_REVERSAL_EXIT","TREND_INVALIDATED_CUT_LOSS",
+                                 StringFormat("ticket=%I64u detail=%s",t,exit_detail));
+                    }
                  }
               }
            }
@@ -274,6 +364,7 @@ int OnInit(void)
    g_login=AccountInfoInteger(ACCOUNT_LOGIN);
    g_server=AccountInfoString(ACCOUNT_SERVER);
    g_observed_bar=iTime(TradeSymbol,SignalTimeframe,0);
+   g_observed_exit_bar=g_observed_bar;
    if(!EventSetTimer(1)) { g_log.Event("INIT_FAILED","TIMER_ERROR"); return INIT_FAILED; }
    g_initialized=true;
    g_log.Event("STARTUP","PHASE1_NOT_RELEASE_APPROVED",EnumToString(ExecutionMode)+" currency="+AccountInfoString(ACCOUNT_CURRENCY));

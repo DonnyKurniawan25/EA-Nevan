@@ -99,7 +99,7 @@ public:
       reason="CLOSE_REQUEST_SENT_RECONCILE";
       return true;
      }
-   bool ClosePosition(const ulong ticket,GSRiskFirewall &risk,GSMetrics &log,string &reason)
+   bool ClosePosition(const ulong ticket,GSRiskFirewall &risk,GSMetrics &log,string &reason,string exit_event="TIME_EXIT_PROFIT")
      {
       if(!risk.CanManage(reason)) return false;
       if(!PositionSelectByTicket(ticket)) return GSReject(reason,"CLOSE_TICKET_NO_LONGER_PRESENT");
@@ -113,9 +113,22 @@ public:
       if(!spec.Filling(filling,reason)) return false;
       m_trade.SetTypeFilling(filling);
       bool sent=m_trade.PositionClose(ticket,(ulong)MaxDeviationPoints);
-      log.Event("CLOSE_RESULT","TIME_EXIT_PROFIT",StringFormat("ticket=%I64u method=%s retcode=%u deal=%I64u",
+      log.Event("CLOSE_RESULT",exit_event,StringFormat("ticket=%I64u method=%s retcode=%u deal=%I64u",
                 ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),m_trade.ResultDeal()));
       reason="CLOSE_REQUEST_SENT_RECONCILE";
+      return sent;
+     }
+   bool ModifyStops(const ulong ticket,const double sl,const double tp,GSRiskFirewall &risk,GSMetrics &log,string &reason)
+     {
+      if(!risk.CanManage(reason)) return false;
+      if(!PositionSelectByTicket(ticket)) return GSReject(reason,"MODIFY_TICKET_NO_LONGER_PRESENT");
+      if(PositionGetString(POSITION_SYMBOL)!=TradeSymbol ||
+         (ulong)PositionGetInteger(POSITION_MAGIC)!=MagicNumber ||
+         StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
+         return GSReject(reason,"MODIFY_OWNERSHIP_REJECTED");
+      bool sent=m_trade.PositionModify(ticket,sl,tp);
+      log.Event("STOP_MODIFY","BREAK_EVEN",StringFormat("ticket=%I64u sent=%s retcode=%u sl=%.5f tp=%.5f",
+                ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),sl,tp));
       return sent;
      }
   };
