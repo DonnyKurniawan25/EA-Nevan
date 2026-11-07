@@ -62,11 +62,11 @@ def write_json(path, data):
     write_new(path, json.dumps(data, indent=2, sort_keys=True) + '\n')
 
 
-def config(preset, probe, live, login=None):
+def config(preset, probe, live, login=None, symbol='XAUUSDm'):
     common = '' if login is None else f'[Common]\nLogin={login}\nServer=Exness-MT5Trial7\nKeepPrivate=1\n'
     return (common + '[Experts]\nEnabled=' + str(int(live)) + '\nAllowLiveTrading=' + str(int(live)) +
             '\nAllowDllImport=0\nAccount=1\nProfile=1\n[StartUp]\nExpert=GoldShield_DEMO20\nExpertParameters=' +
-            preset + '\nSymbol=XAUUSDm\nPeriod=M15\nScript=GoldShield_ServerPreflight\nScriptParameters=' + probe + '\n')
+            preset + f'\nSymbol={symbol}\nPeriod=M15\nScript=GoldShield_ServerPreflight\nScriptParameters=' + probe + '\n')
 
 
 def profile_location(meta):
@@ -88,19 +88,20 @@ def profile_location(meta):
     return name, profile
 
 
-def prepare(session_dir, terminal_dir, magic=None):
+def prepare(session_dir, terminal_dir, magic=None, symbol='XAUUSDm', base_preset=None, login=None):
     directory, terminal = Path(session_dir).absolute(), Path(terminal_dir).resolve()
     require(not directory.exists(), 'session directory already exists')
     require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}', directory.name), 'unsafe session name')
     require(terminal.is_dir(), 'terminal directory missing')
     manifest = json.loads((BUNDLE / 'bundle-manifest.json').read_text())
     source = BUNDLE / 'Experts/GoldShield_DEMO20.ex5'
-    base = BUNDLE / 'presets/DEMO20_CURRENT.set'
-    for file, relative in ((source, 'Experts/GoldShield_DEMO20.ex5'), (base, 'presets/DEMO20_CURRENT.set')):
+    preset_rel = 'presets/' + (base_preset if base_preset else ('DEMO20_BTCUSDm.set' if symbol == 'BTCUSDm' else 'DEMO20_CURRENT.set'))
+    base = BUNDLE / preset_rel
+    for file, relative in ((source, 'Experts/GoldShield_DEMO20.ex5'), (base, preset_rel)):
         require(digest(file) == manifest['files'][relative], 'source bundle hash mismatch')
     fields = parse_set(base)
     expected = {'ExecutionMode': '2', 'EnableAutoTrading': 'true', 'DemoTradingOptIn': 'true',
-                'AllowRealTrading': 'false', 'TradeSymbol': 'XAUUSDm', 'SignalTimeframe': '15',
+                'AllowRealTrading': 'false', 'TradeSymbol': symbol, 'SignalTimeframe': '15',
                 'GridEnabled': 'false', 'ApiEnabled': 'false', 'TelegramEnabled': 'false',
                 'RequiredAccountCurrency': 'USD'}
     require(all(fields.get(k) == v for k, v in expected.items()), 'unsafe base flags')
@@ -123,6 +124,7 @@ def prepare(session_dir, terminal_dir, magic=None):
     nonce = secrets.token_hex(32)
     profile_name, profile_dir = profile_location({'session_dir': str(directory), 'terminal_dir': str(terminal), 'nonce': nonce})
     chart_config = '[Charts]\nProfileLast=' + profile_name + '\n'
+    account_prefix = '' if login is None else f'[Common]\nLogin={login}\nServer=Exness-MT5Trial7\nKeepPrivate=1\n'
     presets = {}
     for name, enabled in (('stage', False), ('active', True)):
         values = dict(fields, MagicNumber=str(magic), EnableAutoTrading=str(enabled).lower(), DemoTradingOptIn=str(enabled).lower())
@@ -136,14 +138,17 @@ def prepare(session_dir, terminal_dir, magic=None):
     write_new(preflight_probe, f'ProbeMagic={magic}\nRequestId={nonce}\nWaitForState=false\n')
     presets['preflight_probe'] = str(preflight_probe)
     rel = 'GoldShieldServer\\' + directory.name + '\\'
-    write_new(directory / 'PREFLIGHT.ini', chart_config + '[Experts]\nEnabled=0\nAllowLiveTrading=0\nAllowDllImport=0\nAccount=1\nProfile=1\n[StartUp]\nSymbol=XAUUSDm\nPeriod=M15\nScript=GoldShield_ServerPreflight\nScriptParameters=' + rel + 'preflight-probe.set\n')
+    write_new(directory / 'PREFLIGHT.ini', account_prefix + chart_config + '[Experts]\nEnabled=0\nAllowLiveTrading=0\nAllowDllImport=0\nAccount=1\nProfile=1\n[StartUp]\nSymbol=' + symbol + '\nPeriod=M15\nScript=GoldShield_ServerPreflight\nScriptParameters=' + rel + 'preflight-probe.set\n')
     for name, live in (('STAGE', False), ('RUN', True)):
-        write_new(directory / (name + '.ini'), chart_config + config(rel + ('active.set' if live else 'stage.set'), rel + 'probe.set', live))
+        write_new(directory / (name + '.ini'), chart_config + config(rel + ('active.set' if live else 'stage.set'), rel + 'probe.set', live, login=login, symbol=symbol))
     paths = [target, directory / 'PREFLIGHT.ini', directory / 'STAGE.ini', directory / 'RUN.ini'] + [Path(p) for p in presets.values()]
     meta = {'status': 'FRESH_SERVER_DEMO20', 'authorization_reason': AUTHORIZATION, 'nonce': nonce,
+            'symbol': symbol,
             'magic': magic, 'old_magic': old_magic, 'terminal_dir': str(terminal), 'session_dir': str(directory),
             'profile_name': profile_name, 'profile_dir': str(profile_dir),
             'created_at': time.time(), 'presets': presets, 'hashes': {str(p): digest(p) for p in paths}}
+    if login is not None:
+        meta['expected_login'] = str(login)
     write_json(directory / 'session.json', meta)
     return meta
 
@@ -154,8 +159,8 @@ CSV_FIELDS = ('nonce connected account_mode margin_mode server currency login sy
               'history_available matching_history_deals namespace_present').split()
 
 
-def audit_key(server, login, magic):
-    identity = f'{server}|{login}|XAUUSDm|{magic}'
+def audit_key(server, login, magic, symbol='XAUUSDm'):
+    identity = f'{server}|{login}|{symbol}|{magic}'
     a, b = 2166136261, 5381
     # MQL StringGetCharacter hashes UTF-16 code units, not UTF-8 bytes.
     encoded = identity.encode('utf-16-le')
@@ -268,9 +273,10 @@ def bind_preflight(session_dir, report_path):
     meta = load_prepared(directory)
     require(not terminal_processes(), 'another terminal64 process exists for this user')
     row = one_row(report_path, CSV_FIELDS)
+    symbol = meta.get('symbol', 'XAUUSDm')
     expected = {'nonce': meta['nonce'], 'magic': str(meta['magic']), 'connected': '1',
                 'account_mode': 'ACCOUNT_TRADE_MODE_DEMO', 'margin_mode': 'ACCOUNT_MARGIN_MODE_RETAIL_HEDGING',
-                'server': 'Exness-MT5Trial7', 'currency': 'USD', 'symbol': 'XAUUSDm',
+                'server': 'Exness-MT5Trial7', 'currency': 'USD', 'symbol': symbol,
                 'positions_total': '0', 'orders_total': '0', 'account_trade_allowed': '1',
                 'account_expert_allowed': '1', 'terminal_trade_allowed': '0', 'history_available': '1',
                 'matching_history_deals': '0', 'namespace_present': '0'}
@@ -280,7 +286,8 @@ def bind_preflight(session_dir, report_path):
     for name in ('balance', 'equity'):
         value = float(row[name])
         require(math.isfinite(value) and 0 < value < sys.float_info.max, 'invalid preflight account')
-    key = audit_key(row['server'], row['login'], meta['magic'])
+    symbol = meta.get('symbol', 'XAUUSDm')
+    key = audit_key(row['server'], row['login'], meta['magic'], symbol=symbol)
     require(row['audit_key'] == key, 'preflight prefix mismatch')
     folder = Path(meta['terminal_dir']) / 'MQL5/Files/GoldShield'
     require(not (folder / (key + '.lock')).exists() and
@@ -324,9 +331,10 @@ def verify_stage(session_dir, now=None):
     now = time.time() if now is None else now
     require(report.is_file() and 0 <= now - report.stat().st_mtime <= 120, 'stale or missing report')
     row = one_row(report, CSV_FIELDS)
+    symbol = meta.get('symbol', 'XAUUSDm')
     expected = {'nonce': meta['nonce'], 'account_mode': 'ACCOUNT_TRADE_MODE_DEMO',
                 'margin_mode': 'ACCOUNT_MARGIN_MODE_RETAIL_HEDGING', 'server': 'Exness-MT5Trial7',
-                'currency': 'USD', 'symbol': 'XAUUSDm', 'magic': str(meta['magic'])}
+                'currency': 'USD', 'symbol': symbol, 'magic': str(meta['magic'])}
     require(all(row.get(k) == v for k, v in expected.items()), 'native report identity mismatch')
     require(re.fullmatch('[1-9][0-9]*', row['login']), 'invalid account identity')
     require(meta.get('expected_login', row['login']) == row['login'], 'stage account differs from readonly preflight')
@@ -341,11 +349,11 @@ def verify_stage(session_dir, now=None):
     for field in ('positions_total', 'orders_total', 'entry_submissions', 'blocked', 'pending'):
         require(float(row[field]) == 0, 'stage must be fresh flat unblocked state')
     require(float(row['limit']) == 20, 'trial cap mismatch')
-    key = audit_key(row['server'], row['login'], meta['magic'])
+    key = audit_key(row['server'], row['login'], meta['magic'], symbol=symbol)
     require(re.fullmatch(r'GS2\.[0-9A-F]{16}', row['audit_key']) and row['audit_key'] == key, 'native audit key mismatch')
     persistent = persistent_files(meta, key)
     snapshot = one_row(folder / f"demo20_{meta['magic']}.csv")
-    for k, v in {'account_mode': 'DEMO', 'symbol': 'XAUUSDm', 'limit': '20', 'entry_submissions': '0', 'open_positions': '0'}.items():
+    for k, v in {'account_mode': 'DEMO', 'symbol': symbol, 'limit': '20', 'entry_submissions': '0', 'open_positions': '0'}.items():
         require(snapshot.get(k) == v, 'trial snapshot mismatch')
     status = '|'.join(snapshot.values()).upper()
     require(not any(token in status for token in ('ERROR_BLOCKED', 'PAUSED_RISK', 'HISTORY_UNAVAILABLE')), 'trial snapshot blocked')
@@ -411,8 +419,8 @@ def launch_argv(session_dir, mode, converter=None, processes=None):
         identity = receipt['identity']
         require(identity['server'] == 'Exness-MT5Trial7' and identity['account_mode'] == 'ACCOUNT_TRADE_MODE_DEMO' and
                 identity['currency'] == 'USD' and identity['margin_mode'] == 'ACCOUNT_MARGIN_MODE_RETAIL_HEDGING' and
-                identity['symbol'] == 'XAUUSDm', 'stage receipt account mismatch')
-        require(receipt['audit_key'] == audit_key(identity['server'], identity['login'], meta['magic']), 'stage prefix mismatch')
+                identity['symbol'] == meta.get('symbol', 'XAUUSDm'), 'stage receipt account mismatch')
+        require(receipt['audit_key'] == audit_key(identity['server'], identity['login'], meta['magic'], symbol=identity['symbol']), 'stage prefix mismatch')
         marker = directory / 'ACTIVATE_SERVER_DEMO20'
         require(marker.is_file() and marker.read_text().strip() == meta['nonce'], 'explicit session activation marker required')
         persistent = persistent_files(meta, receipt['audit_key'])
@@ -429,6 +437,9 @@ def main(argv=None):
     prep.add_argument('--session-dir', required=True, type=Path)
     prep.add_argument('--terminal-dir', required=True, type=Path)
     prep.add_argument('--magic', type=int)
+    prep.add_argument('--symbol', default='XAUUSDm')
+    prep.add_argument('--base-preset', default=None)
+    prep.add_argument('--login', default=None)
     verify = commands.add_parser('verify-stage')
     verify.add_argument('--session-dir', required=True, type=Path)
     configure = commands.add_parser('configure-profile')
@@ -442,7 +453,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.command == 'prepare':
-            prepare(args.session_dir, args.terminal_dir, args.magic)
+            prepare(args.session_dir, args.terminal_dir, args.magic, symbol=args.symbol, base_preset=args.base_preset, login=args.login)
             print('FRESH_SERVER_DEMO20_PREPARED')
         elif args.command == 'verify-stage':
             verify_stage(args.session_dir)

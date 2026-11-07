@@ -6,7 +6,7 @@ input bool WaitForState=true;
 
 string AuditKey()
   {
-   string identity=StringFormat("%s|%I64d|XAUUSDm|%I64u",AccountInfoString(ACCOUNT_SERVER),AccountInfoInteger(ACCOUNT_LOGIN),ProbeMagic);
+   string identity=StringFormat("%s|%I64d|%s|%I64u",AccountInfoString(ACCOUNT_SERVER),AccountInfoInteger(ACCOUNT_LOGIN),_Symbol,ProbeMagic);
    uint a=2166136261,b=5381;
    for(int i=0;i<StringLen(identity);i++)
      {
@@ -44,7 +44,7 @@ void OnStart()
         {
          ulong deal=HistoryDealGetTicket(i);
          if(deal==0) { history_available=false; break; }
-         if(HistoryDealGetString(deal,DEAL_SYMBOL)=="XAUUSDm" &&
+         if(HistoryDealGetString(deal,DEAL_SYMBOL)==_Symbol &&
             (ulong)HistoryDealGetInteger(deal,DEAL_MAGIC)==ProbeMagic) matching_history_deals++;
         }
    bool namespace_present=FileIsExist("GoldShield\\"+key+".lock") || FileIsExist("GoldShield\\"+key+".csv");

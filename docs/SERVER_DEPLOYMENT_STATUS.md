@@ -1,13 +1,15 @@
 # Deployment server — GoldShield DEMO20
 
-Terakhir diverifikasi: **7 November 2026, 03:33 UTC**. Status operasi DEMO, bukan bukti profitabilitas atau kelayakan akun real.
+Terakhir diverifikasi: **7 November 2026, 06:10 UTC**. Status operasi DEMO, bukan bukti profitabilitas atau kelayakan akun real.
 
 ## Jalur yang dipilih operator
 
 Operator membatalkan migrasi PC dan memilih **sesi DEMO baru di server**, setelah menyatakan EA PC dinonaktifkan. Sesi server menggunakan Magic/namespace baru; state lama tidak dihapus atau direset. Receipt impor PC tidak dibuat. Panduan migrasi tetap tersedia untuk migrasi yang memang disetujui, bukan syarat sesi baru ini.
 
 - Repo: `/home/ubuntu/EA-Nevan`.
-- Sesi privat: `/home/ubuntu/goldshield-server-demo/server-20261107`.
+- Sesi Hari Kerja (Emas): `/home/ubuntu/goldshield-server-demo/server-20261107` (`XAUUSDm`, M15, Magic `2862923531892515`).
+- Sesi Akhir Pekan (Kripto): `/home/ubuntu/goldshield-server-demo/weekend-btc-20261107` (`BTCUSDm`, M15, Magic `8423558503518657`).
+- Tool switcher sesi: `/home/ubuntu/EA-Nevan/tools/switch_session.py` (`weekend`, `weekday`, `status`).
 - MT5 berjalan sebagai `ubuntu`, prefix `/home/ubuntu/.mt5`, `/portable`, display `:1`.
 - Akun dipilih lewat konfigurasi privat dari preflight native yang tervalidasi; password tersimpan MT5 tidak diekstrak.
 
@@ -33,7 +35,7 @@ Operator membatalkan migrasi PC dan memilih **sesi DEMO baru di server**, setela
 
 ## Pengujian dan batas verifikasi
 
-- Suite terbaru: **72 tes Python, OK dengan 3 skip installer Windows**, serta **11 tes UI Node lulus**.
+- Suite terbaru: **73 tes Python, OK dengan 3 skip installer Windows**, serta **11 tes UI Node lulus**.
 - Safety-math C++ memakai `.mqh` asli: **40.055 assertions lulus**. Ini bukan backtest profitabilitas.
 - Observer native dikompilasi dengan MetaEditor aktual: **0 errors, 0 warnings**, EX5 hasil compile benar-benar ada. CLI exit code saja tidak dipakai sebagai bukti.
 - Review independen jalur sesi baru, profil, binding akun dan perbaikan global-off STAGE: SPEC PASS lalu kualitas approved.

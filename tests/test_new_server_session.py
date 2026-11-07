@@ -174,7 +174,8 @@ class NewSessionTests(unittest.TestCase):
     def report(self, meta, **changes):
         folder = self.terminal / 'MQL5/Files/GoldShield'
         folder.mkdir(parents=True, exist_ok=True)
-        key = session.audit_key('Exness-MT5Trial7', '12345', meta['magic'])
+        symbol = changes.get('symbol', meta.get('symbol', 'XAUUSDm'))
+        key = session.audit_key('Exness-MT5Trial7', '12345', meta['magic'], symbol=symbol)
         (folder / (key + '.lock')).write_bytes(b'\x01\x00\x00\x00')
         bases = self.terminal / 'Bases'
         bases.mkdir(exist_ok=True)
@@ -182,7 +183,7 @@ class NewSessionTests(unittest.TestCase):
         row = dict(zip(session.CSV_FIELDS, [''] * len(session.CSV_FIELDS)))
         row.update(nonce=meta['nonce'], connected='1', account_mode='ACCOUNT_TRADE_MODE_DEMO',
                    margin_mode='ACCOUNT_MARGIN_MODE_RETAIL_HEDGING', server='Exness-MT5Trial7',
-                   currency='USD', login='12345', symbol='XAUUSDm', balance='1000', equity='1000',
+                   currency='USD', login='12345', symbol=symbol, balance='1000', equity='1000',
                    positions_total='0', orders_total='0', account_trade_allowed='1', account_expert_allowed='1',
                    terminal_trade_allowed='0', magic=str(meta['magic']), audit_key=key, store_schema='1',
                    reference='1000', trial_schema='1', entry_submissions='0', limit='20', blocked='0', pending='0',
@@ -192,7 +193,7 @@ class NewSessionTests(unittest.TestCase):
             writer = csv.DictWriter(stream, fieldnames=session.CSV_FIELDS)
             writer.writeheader(); writer.writerow(row)
         with (folder / f"demo20_{meta['magic']}.csv").open('w', newline='') as stream:
-            snapshot = dict(account_mode='DEMO', symbol='XAUUSDm', limit='20', entry_submissions='0',
+            snapshot = dict(account_mode='DEMO', symbol=symbol, limit='20', entry_submissions='0',
                             open_positions='0', trial_status='RUNNING_WAIT_VALID_SIGNAL', core_state='READY', core_reason='NONE')
             writer = csv.DictWriter(stream, fieldnames=list(snapshot))
             writer.writeheader(); writer.writerow(snapshot)
@@ -420,6 +421,18 @@ class NewSessionTests(unittest.TestCase):
         Path(meta['presets']['stage']).write_text('modified')
         with self.assertRaises(session.GuardError):
             session.verify_stage(self.directory)
+
+    def test_btc_weekend_symbol_prepare_and_stage(self):
+        btc_dir = self.root / 'weekend-btc'
+        meta = session.prepare(btc_dir, self.terminal, symbol='BTCUSDm')
+        self.assertEqual(meta['symbol'], 'BTCUSDm')
+        self.assertIn('TradeSymbol=BTCUSDm', Path(meta['presets']['active']).read_text())
+        self.assertIn('Symbol=BTCUSDm', (btc_dir / 'STAGE.ini').read_text())
+        self.assertIn('Symbol=BTCUSDm', (btc_dir / 'RUN.ini').read_text())
+        self.report(meta, symbol='BTCUSDm')
+        receipt = session.verify_stage(btc_dir)
+        self.assertEqual(receipt['status'], 'FRESH_SERVER_DEMO20_STAGE_VERIFIED')
+        self.assertEqual(receipt['identity']['symbol'], 'BTCUSDm')
 
 
 if __name__ == '__main__':
