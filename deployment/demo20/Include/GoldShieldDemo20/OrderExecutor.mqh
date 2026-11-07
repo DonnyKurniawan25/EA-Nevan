@@ -25,13 +25,16 @@ public:
       if(!GSPositive(plan.sl) || !GSPositive(plan.tp) || !GSPositive(plan.volume))
          return GSReject(reason,"EXECUTOR_REQUIRES_PROTECTIVE_STOPS");
       // Reconcile again immediately before submission; never retry an uncertain entry.
+      int count_owned=0;
       for(int i=PositionsTotal()-1;i>=0;i--)
         {
          if(PositionGetTicket(i)==0) return GSReject(reason,"PRE_SEND_POSITION_READ_FAILED");
          if(PositionGetString(POSITION_SYMBOL)==TradeSymbol &&
             (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
-            return GSReject(reason,"PRE_SEND_BASKET_ALREADY_EXISTS");
+            count_owned++;
         }
+      if(count_owned>=MaxAccountPositions)
+         return GSReject(reason,"PRE_SEND_BASKET_ALREADY_EXISTS");
       if(OrdersTotal()>0) return GSReject(reason,"PRE_SEND_PENDING_ORDER_EXISTS");
       MqlTradeRequest request={};
       MqlTradeCheckResult check={};
@@ -95,6 +98,25 @@ public:
                 ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),m_trade.ResultDeal()));
       reason="CLOSE_REQUEST_SENT_RECONCILE";
       return true;
+     }
+   bool ClosePosition(const ulong ticket,GSRiskFirewall &risk,GSMetrics &log,string &reason)
+     {
+      if(!risk.CanManage(reason)) return false;
+      if(!PositionSelectByTicket(ticket)) return GSReject(reason,"CLOSE_TICKET_NO_LONGER_PRESENT");
+      if(PositionGetString(POSITION_SYMBOL)!=TradeSymbol ||
+         (ulong)PositionGetInteger(POSITION_MAGIC)!=MagicNumber ||
+         StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
+         return GSReject(reason,"CLOSE_OWNERSHIP_REJECTED");
+      GSSymbolSpec spec;
+      if(!spec.Load(TradeSymbol,reason)) return false;
+      ENUM_ORDER_TYPE_FILLING filling;
+      if(!spec.Filling(filling,reason)) return false;
+      m_trade.SetTypeFilling(filling);
+      bool sent=m_trade.PositionClose(ticket,(ulong)MaxDeviationPoints);
+      log.Event("CLOSE_RESULT","TIME_EXIT_PROFIT",StringFormat("ticket=%I64u method=%s retcode=%u deal=%I64u",
+                ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),m_trade.ResultDeal()));
+      reason="CLOSE_REQUEST_SENT_RECONCILE";
+      return sent;
      }
   };
 #endif

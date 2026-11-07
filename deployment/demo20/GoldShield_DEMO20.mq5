@@ -57,11 +57,24 @@ void GSProcess(const bool evaluate_signal)
       return;
      }
    double pending=g_storage.Get(".pending");
-   if(pending>0.0 && pending!=EMPTY_VALUE && g_owned.count==1)
+   if(pending>0.0 && pending!=EMPTY_VALUE && g_owned.count>0)
      {
-      if(g_storage.ConfirmEntry(g_owned.comment))
-         g_log.Event("FILL_CONFIRMED","BROKER_POSITION_PRESENT",StringFormat("ticket=%I64u identifier=%I64d lots=%.8f",
-                     g_owned.ticket,g_owned.identifier,g_owned.volume));
+      string expected="GS2|"+IntegerToString((long)pending);
+      for(int i=PositionsTotal()-1;i>=0;i--)
+        {
+         ulong t=PositionGetTicket(i);
+         if(t==0 || !PositionSelectByTicket(t)) continue;
+         if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+           {
+            if(PositionGetString(POSITION_COMMENT)==expected)
+              {
+               if(g_storage.ConfirmEntry(expected))
+                  g_log.Event("FILL_CONFIRMED","BROKER_POSITION_PRESENT",StringFormat("ticket=%I64u identifier=%I64d lots=%.8f",
+                              t,PositionGetInteger(POSITION_IDENTIFIER),PositionGetDouble(POSITION_VOLUME)));
+               break;
+              }
+           }
+        }
      }
    if(g_owned.count==0 && g_owned.pending_orders==0 && g_storage.Get(".pending")<0.0)
      {
@@ -74,6 +87,31 @@ void GSProcess(const bool evaluate_signal)
       g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY","Realized net P/L not calculated in Phase 1");
      }
    g_had_position=(g_owned.count>0);
+
+   // Rule 1: Time-based profit exit (MaxHoldMinutes)
+   if(MaxHoldMinutes>0 && g_owned.count>0)
+     {
+      for(int i=PositionsTotal()-1;i>=0;i--)
+        {
+         ulong t=PositionGetTicket(i);
+         if(t==0 || !PositionSelectByTicket(t)) continue;
+         if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+           {
+            datetime opened=(datetime)PositionGetInteger(POSITION_TIME);
+            double profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+            if(TimeTradeServer()-opened>=MaxHoldMinutes*60 && profit>0.0)
+              {
+               string close_reason="";
+               if(g_executor.ClosePosition(t,g_risk,g_log,close_reason))
+                 {
+                  g_log.Event("TIME_PROFIT_EXIT","HOLD_DURATION_TARGET_UNREACHED",
+                              StringFormat("ticket=%I64u profit=%.2f hold_sec=%I64d",
+                              t,profit,(long)(TimeTradeServer()-opened)));
+                 }
+              }
+           }
+        }
+     }
 
    // Risk exits precede all signal logic. Never loosen a server stop.
    double reference=g_storage.RiskReference();
@@ -119,9 +157,9 @@ void GSProcess(const bool evaluate_signal)
       g_processing=false;
       return;
      }
-   if(g_owned.count>0 || g_owned.pending_orders>0)
+   if(g_owned.count>=MaxAccountPositions || g_owned.pending_orders>0)
      {
-      g_state.Set(BASKET_ACTIVE,"SINGLE_POSITION_SERVER_SL_TP",g_log);
+      g_state.Set(BASKET_ACTIVE,(g_owned.count>1 ? "MULTI_POSITION_SERVER_SL_TP" : "SINGLE_POSITION_SERVER_SL_TP"),g_log);
       GSDemo20Status(g_storage,g_owned,g_state); GSDrawPanel(g_state,g_owned,g_signal,g_storage.Key());
       g_processing=false;
       return;

@@ -35,7 +35,7 @@ public:
             owned.pending_orders++;
         }
       if(owned.collision) return GSReject(reason,"MAGIC_OR_COMMENT_COLLISION");
-      if(owned.count>1) return GSReject(reason,"MULTIPLE_POSITIONS_UNSUPPORTED_PHASE1");
+      if(owned.count>MaxAccountPositions) return GSReject(reason,"MULTIPLE_POSITIONS_UNSUPPORTED_PHASE1");
       return true;
      }
   };

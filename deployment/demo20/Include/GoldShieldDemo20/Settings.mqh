@@ -24,11 +24,12 @@ input int RSIPeriod=14;
 input bool UseRSIFilter=true;
 input int ATRPeriod=14;
 input int MinClosedBars=250;
-input double StopATRMultiple=2.0;
+input double StopATRMultiple=1.2;
 input double RewardRiskMultiple=2.0;
 input double MaxCandleATRMultiple=3.0;
 input double MaxGapATRMultiple=1.0;
 input int MaxSignalAgeSeconds=120;
+input int MaxHoldMinutes=60; // Auto-close profitable trade after N minutes (0=disabled)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
@@ -91,7 +92,7 @@ bool GSValidateSettings(string &reason)
       return GSReject(reason,"INVALID_DAILY_WEEKLY_LIMITS");
    if(!GSPositive(BaseLot) || !GSPositive(StopATRMultiple) ||
       !GSPositive(RewardRiskMultiple) || !GSPositive(MaxCandleATRMultiple) ||
-      !GSPositive(MaxGapATRMultiple) || MaxSignalAgeSeconds<1)
+      !GSPositive(MaxGapATRMultiple) || MaxSignalAgeSeconds<1 || MaxHoldMinutes<0)
       return GSReject(reason,"INVALID_SIGNAL_OR_VOLUME_SETTINGS");
    if(!GSPositive(MaxRiskPerTradePct) || MaxRiskPerTradePct>0.5 ||
       !GSPositive(MaxAggregateOpenRiskPct) || MaxAggregateOpenRiskPct>1.0 ||
