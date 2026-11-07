@@ -10,18 +10,18 @@ import tempfile
 
 AUDIT_HEADER = "event_id,server_time,utc_time,clock_source,event,symbol,candle_id_server,reason_code,details".split(",")
 LABELS = {
-    "ORDER_INTENT": "Intent entry — belum dikirim atau terisi di broker",
-    "ORDER_RESULT": "Permintaan entry — BUKAN konfirmasi posisi",
-    "ORDER_CHECK": "Preflight entry ditolak",
-    "FILL_CONFIRMED": "Posisi terkonfirmasi dari snapshot broker",
-    "CLOSE_RESULT": "Permintaan tutup — perlu rekonsiliasi",
-    "EXIT_CONFIRMED": "Exit terkonfirmasi: tidak ada sisa posisi EA; net menunggu riwayat",
-    "POSITION_CLOSED": "Posisi tidak ada pada snapshot broker; net menunggu riwayat",
-    "STORAGE_ERROR": "Kesalahan penyimpanan pengaman",
-    "INIT_FAILED": "Inisialisasi EA gagal",
-    "TIME_PROFIT_EXIT": "Target waktu tercapai: posisi ditutup saat untung",
-    "EARLY_REVERSAL_EXIT": "Pembalikan tren terdeteksi: cut loss dini",
-    "STOP_MODIFY": "Proteksi modal: Stop Loss digeser ke Break-Even",
+    "ORDER_INTENT": "Mempersiapkan order baru (Intent entry)",
+    "ORDER_RESULT": "Permintaan entry — BUKAN konfirmasi posisi (sedang diproses broker)",
+    "ORDER_CHECK": "Pemeriksaan gagal: Preflight entry ditolak broker",
+    "FILL_CONFIRMED": "Posisi terkonfirmasi aktif di pasar broker",
+    "CLOSE_RESULT": "Permintaan tutup order sedang diproses broker",
+    "EXIT_CONFIRMED": "Posisi selesai ditutup bersih di broker",
+    "POSITION_CLOSED": "Pembaruan broker: Posisi sudah selesai ditutup",
+    "STORAGE_ERROR": "Peringatan: Kesalahan penyimpanan pengaman",
+    "INIT_FAILED": "Peringatan: Inisialisasi robot gagal",
+    "TIME_PROFIT_EXIT": "Target waktu tercapai: Posisi ditutup saat untung",
+    "EARLY_REVERSAL_EXIT": "Pembalikan arah tren terdeteksi: Cut loss dini",
+    "STOP_MODIFY": "Proteksi modal: Stop Loss digeser ke Break-Even (Rp0 risiko)",
 }
 ALERT_STATES = {"PAUSED_RISK", "ERROR_BLOCKED", "SAFE_MODE", "PAUSED_MANUAL", "PAUSED_VOLATILITY"}
 REASONS = set("""BASELINE_RULES RECONCILIATION_REQUIRED BROKER_PREFLIGHT_REJECTED BROKER_POSITION_PRESENT
@@ -35,6 +35,53 @@ DURABLE_ENTRY_INTENT_FAILED CLOSE_RETRY_LIMIT_OPERATOR_REQUIRED CLOSE_RETRY_BACK
 CLOSE_TICKET_NO_LONGER_PRESENT CLOSE_OWNERSHIP_REJECTED INDICATOR_HANDLE_ERROR TIMER_ERROR
 HOLD_VOLATILITY_OR_GAP AUTO_ENTRY_DISABLED HOLD_STALE_TICK HOLD_TICK_UNAVAILABLE
 TIME_EXIT_PROFIT HOLD_DURATION_TARGET_UNREACHED EARLY_REVERSAL_EXIT TREND_INVALIDATED_CUT_LOSS BREAK_EVEN""".split())
+
+EVENT_ICONS = {
+    "SIGNAL": "🔔",
+    "ORDER_INTENT": "📝",
+    "ORDER_RESULT": "📤",
+    "ORDER_CHECK": "⚠️",
+    "FILL_CONFIRMED": "✅",
+    "CLOSE_RESULT": "🔄",
+    "EXIT_CONFIRMED": "🏁",
+    "POSITION_CLOSED": "🏁",
+    "STORAGE_ERROR": "❌",
+    "INIT_FAILED": "❌",
+    "TIME_PROFIT_EXIT": "🎯",
+    "EARLY_REVERSAL_EXIT": "⚠️",
+    "STOP_MODIFY": "🛡️",
+    "STATE": "ℹ️",
+}
+
+REASON_DESCRIPTIONS = {
+    "TIME_EXIT_PROFIT": "Target waktu 30 menit tercapai (amankan profit)",
+    "HOLD_DURATION_TARGET_UNREACHED": "Target waktu tahan selesai saat posisi untung",
+    "TREND_INVALIDATED_CUT_LOSS": "Pembalikan tren terdeteksi (cut loss dini)",
+    "BREAK_EVEN": "Proteksi modal: Stop Loss digeser ke harga modal",
+    "BROKER_SNAPSHOT_EMPTY": "Posisi selesai ditutup di broker",
+    "BROKER_POSITION_PRESENT": "Posisi aktif di broker",
+    "BASELINE_RULES": "Sesuai aturan strategi indikator",
+    "RECONCILIATION_REQUIRED": "Permintaan diproses broker",
+    "CANDIDATE_BASELINE_EMA_RSI": "Validasi indikator EMA & RSI",
+    "HOLD_DAILY_ENTRY_LIMIT": "Batas kuota harian tercapai (mencegah overtrade)",
+    "DISCONNECTED_SERVER_STOPS_ONLY": "Koneksi terputus (Stop Loss server aktif)",
+    "EQUITY_REFERENCE_FLOOR": "Batas pengaman modal minimum",
+}
+
+KEY_TRANSLATIONS = {
+    "ticket": "Tiket",
+    "order": "Nomor Order",
+    "deal": "Nomor Deal",
+    "identifier": "ID Posisi",
+    "lots": "Volume",
+    "entry": "Harga Masuk",
+    "sl": "Batas Rugi (SL)",
+    "tp": "Target Untung (TP)",
+    "retcode": "Status Broker",
+    "budget": "Alokasi Modal",
+    "risk_est": "Estimasi Risiko",
+    "margin_est": "Estimasi Margin",
+}
 
 
 def audit_message(row):
@@ -56,25 +103,65 @@ def audit_message(row):
         if not match:
             return None, None
         side = "BUY" if match.group(1) == "GS_BUY" else "SELL"
+        side_id = "Beli (BUY)" if side == "BUY" else "Jual (SELL)"
         label = f"Sinyal {side} terdeteksi"
         reason = item["reason_code"] if item["reason_code"] in REASONS | {"CANDIDATE_BASELINE_EMA_RSI"} else "OTHER_REASON_REDACTED"
         metrics = dict(re.findall(r"\b(close|fast|slow|rsi|atr)=([0-9]+(?:\.[0-9]+)?)", item["details"]))
-        parts = [f"Aksi: {side}"]
+        icon = EVENT_ICONS.get("SIGNAL", "🔔")
+        lines = [
+            f"{icon} GoldShield DEMO | {label}",
+            f"Pasar: {symbol} | {reason}",
+            f"• Aksi: {side_id}",
+        ]
         if "close" in metrics:
-            parts.append(f"Harga: {metrics['close']}")
+            lines.append(f"• Harga: {metrics['close']}")
         if "rsi" in metrics:
-            parts.append(f"RSI: {metrics['rsi']}")
+            lines.append(f"• RSI: {metrics['rsi']}")
         if "atr" in metrics:
-            parts.append(f"ATR: {metrics['atr']}")
-        return ("GoldShield DEMO | " + label + "\n" + symbol + " | " + reason + "\n" + " | ".join(parts))[:1500], None
+            lines.append(f"• ATR: {metrics['atr']}")
+        return ("\n".join(lines))[:1500], None
     if not label:
         return None, None
     # Discard arbitrary text; only exact reason constants and numeric detail keys.
     reason = item["reason_code"] if item["reason_code"] in REASONS else "OTHER_REASON_REDACTED"
-    values = []
+    icon = EVENT_ICONS.get(event, "ℹ️")
+    reason_desc = REASON_DESCRIPTIONS.get(reason)
+    if reason_desc:
+        reason_text = f"{reason} ({reason_desc})"
+    else:
+        reason_text = reason
+
+    formatted_vals = []
     for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
-        values.append(key + "=" + value)
-    return ("GoldShield DEMO | " + label + "\n" + symbol + " | " + reason + ("\n" + " ".join(values[:12]) if values else ""))[:1500], signature
+        lbl = KEY_TRANSLATIONS.get(key, key)
+        if key == "retcode" and value == "10009":
+            formatted_vals.append(f"• {lbl}: 10009 (Sukses)")
+        elif key == "ticket":
+            formatted_vals.append(f"• {lbl}: #{value}")
+        elif key == "lots":
+            formatted_vals.append(f"• {lbl}: {value} Lot")
+        else:
+            formatted_vals.append(f"• {lbl}: {value}")
+
+    lines = [
+        f"{icon} GoldShield DEMO | {label}",
+        f"Pasar: {symbol} | {reason_text}",
+    ]
+    if formatted_vals:
+        lines.extend(formatted_vals[:12])
+
+    if event == "TIME_PROFIT_EXIT":
+        lines.append("Penjelasan: Waktu tahan 30 menit selesai, posisi ditutup saat untung.")
+    elif event == "EARLY_REVERSAL_EXIT":
+        lines.append("Penjelasan: Indikator mendeteksi tren berbalik arah, cut loss dini dijalankan.")
+    elif event == "STOP_MODIFY" and "BREAK_EVEN" in reason:
+        lines.append("Penjelasan: Stop Loss digeser ke harga masuk. Posisi aman, risiko kerugian modal kini $0.00.")
+    elif event == "FILL_CONFIRMED":
+        lines.append("Penjelasan: Order telah terisi aktif di broker dan dipantau sistem.")
+    elif event == "POSITION_CLOSED":
+        lines.append("Penjelasan: Posisi sudah selesai ditutup di broker.")
+
+    return ("\n".join(lines))[:1500], signature
 
 
 
@@ -113,30 +200,31 @@ def snapshot_message(old, new):
     if new["trial_status"] == "HISTORY_UNAVAILABLE_REVIEW_REQUIRED":
         if old and old["trial_status"] == "HISTORY_UNAVAILABLE_REVIEW_REQUIRED":
             return None
-        return "GoldShield DEMO | riwayat tidak tersedia — PERLU PEMERIKSAAN; fill/close/net tidak disimpulkan"
+        return "⚠️ GoldShield DEMO | riwayat tidak tersedia — PERLU PEMERIKSAAN; fill/close/net tidak disimpulkan"
     if old and old["trial_status"] == "HISTORY_UNAVAILABLE_REVIEW_REQUIRED":
-        return ("GoldShield DEMO | Riwayat pulih; hanya penghitung kumulatif, bukan kesimpulan transaksi baru\n"
-                + "Net tertutup kumulatif=" + new["net_closed"] + " " + new["currency"] + " — BUKAN profit satu transaksi")
+        return ("ℹ️ GoldShield DEMO | Riwayat pulih; hanya penghitung kumulatif, bukan kesimpulan transaksi baru\n"
+                + "• Net tertutup kumulatif=" + new["net_closed"] + " " + new["currency"] + " — BUKAN profit satu transaksi")
     pieces = []
     if old is None:
-        pieces.append("Status aktif pertama yang teramati (bukan bukti transaksi baru)")
+        pieces.append("• Status aktif pertama yang teramati (bukan bukti transaksi baru)")
     else:
         for key, label in (("filled_positions", "posisi terkonfirmasi"), ("closed_positions", "posisi tertutup")):
             delta = new[key] - old[key]
             if delta > 0:
-                pieces.append(label + " +" + str(delta))
+                pieces.append(f"• {label} +{delta}")
             elif delta < 0:
-                pieces.append("PENGHITUNG TURUN / RIWAYAT BERUBAH; transaksi tidak disimpulkan")
+                pieces.append("• PENGHITUNG TURUN / RIWAYAT BERUBAH; transaksi tidak disimpulkan")
         if new["entry_submissions"] != old["entry_submissions"]:
-            pieces.append("pengiriman entry=" + str(new["entry_submissions"]) + " (bukan konfirmasi fill)")
+            pieces.append(f"• Pengiriman entry={new['entry_submissions']} (bukan konfirmasi fill)")
         if new["core_state"] in ALERT_STATES and (new["core_state"], new["core_reason"]) != (old["core_state"], old["core_reason"]):
-            pieces.append("Status pengaman: " + new["core_state"] + " | " + new["core_reason"])
+            pieces.append(f"• Status pengaman: {new['core_state']} | {new['core_reason']}")
         if new["trial_status"] != old["trial_status"]:
-            pieces.append(new["trial_status"])
+            pieces.append(f"• Status sesi: {new['trial_status']}")
     if not pieces and (old is None or new["net_closed"] == old["net_closed"]):
         return None
-    pieces.append("Net tertutup kumulatif=" + new["net_closed"] + " " + new["currency"] + " — BUKAN profit satu transaksi")
-    return ("GoldShield DEMO status | " + new["symbol"] + "\n" + "\n".join(pieces))[:1500]
+    pieces.append(f"• Net tertutup kumulatif={new['net_closed']} {new['currency']} — BUKAN profit satu transaksi")
+    pieces.append("Catatan: Angka di atas adalah akumulasi keuntungan/kerugian dari seluruh order yang telah selesai.")
+    return ("📊 GoldShield DEMO status | " + new["symbol"] + "\n" + "\n".join(pieces))[:1500]
 
 
 def records(data):
