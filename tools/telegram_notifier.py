@@ -76,6 +76,11 @@ REASON_DESCRIPTIONS = {
     "HOLD_HTF_TREND_BEARISH": "Tren H1 sedang turun (bearish), sinyal beli M15 dibatalkan",
     "HOLD_HTF_TREND_BULLISH": "Tren H1 sedang naik (bullish), sinyal jual M15 dibatalkan",
     "HOLD_ADX_SIDEWAYS": "Pasar sedang sideways/flat (kekuatan tren lemah, ADX < batas aman)",
+    "HOLD_CANDLE_BEARISH": "Candle M15 Berwarna Merah (Menolak BUY)",
+    "HOLD_CANDLE_BULLISH": "Candle M15 Berwarna Hijau (Menolak SELL)",
+    "HOLD_CANDLE_UPPER_WICK_REJECTION": "Sumbu Atas Panjang / Rejection (Batal BUY)",
+    "HOLD_CANDLE_LOWER_WICK_REJECTION": "Sumbu Bawah Panjang / Rejection (Batal SELL)",
+    "HOLD_LOW_TICK_VOLUME": "Volume Pasar Rendah / Sepi (Batal Masuk)",
     "DISCONNECTED_SERVER_STOPS_ONLY": "Koneksi terputus (Stop Loss server aktif)",
     "EQUITY_REFERENCE_FLOOR": "Batas pengaman modal minimum",
 }
@@ -523,6 +528,44 @@ class Notifier:
                 self.deliver_pending()
             self.state["last_daily_recap"] = today_date
             self.save()
+
+        # Paket D: Floating Drawdown Alert
+        acc_file = self.source / "account_live.csv"
+        if acc_file.exists():
+            try:
+                lines = acc_file.read_text(errors="ignore").strip().splitlines()
+                if len(lines) >= 2:
+                    parts = lines[1].split(",")
+                    bal_val, eq_val, curr, open_cnt = (
+                        float(parts[1]), float(parts[2]), parts[3], int(parts[4])
+                    )
+                    drawdown = max(0.0, bal_val - eq_val)
+                    drawdown_pct = (drawdown / bal_val * 100.0) if bal_val > 0 else 0.0
+                    last_alert_tier = float(self.state.get("last_drawdown_alert_tier", 0.0))
+                    # Trigger alert if floating minus >= 1.0 USD and drawdown_pct >= 0.1%
+                    if open_cnt > 0 and drawdown >= 1.0 and drawdown_pct >= 0.1:
+                        current_tier = round(drawdown_pct * 4) / 4.0  # Alert every 0.25% step
+                        if current_tier > last_alert_tier:
+                            alert_msg = (
+                                f"⚠️ SIAGA FLOATING DRAWDOWN\n"
+                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                                f"• Saldo Akun: ${bal_val:,.2f} {curr}\n"
+                                f"• Ekuitas Akun: ${eq_val:,.2f} {curr}\n"
+                                f"• Floating Minus: -${drawdown:.2f} {curr} (-{drawdown_pct:.2f}%)\n"
+                                f"• Posisi Terbuka: {open_cnt} Transaksi\n"
+                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                                f"🛡️ Proteksi: Robot memantau Stop Loss (2.0 ATR) & Early Cut-Loss otomatis."
+                            )
+                            self.state["last_drawdown_alert_tier"] = current_tier
+                            self.state["pending"] = {"message": alert_msg, "group": "system", "key": "drawdown_alert", "value": current_tier}
+                            self.save()
+                            self.deliver_pending()
+                    elif open_cnt == 0 or drawdown < 0.2:
+                        if last_alert_tier > 0.0:
+                            self.state["last_drawdown_alert_tier"] = 0.0
+                            self.save()
+            except Exception:
+                pass
 
     def deliver_pending(self):
         pending = self.state.get("pending") if self.state else None

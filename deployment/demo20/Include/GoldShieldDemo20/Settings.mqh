@@ -46,6 +46,10 @@ input bool UsePartialTakeProfit=true; // Amankan profit sebagian di TP 1
 input double PartialCloseTriggerATR=1.0; // Jarak profit untuk memicu partial close (1.0 = 1.0 ATR)
 input double PartialClosePct=50.0; // Persentase volume yang ditutup di TP 1 (default 50%)
 input bool RequireFreshCross=false; // Hanya masuk saat bar baru saja crossover (opsional filter pucuk)
+input bool UseCandleDirectionFilter=true; // Sinyal wajib searah candle M15 (BUY hijau, SELL merah)
+input double MinCandleClosePercent=50.0; // Tutup candle minimal di 50% range atas (BUY) atau bawah (SELL)
+input bool UseTickVolumeFilter=true; // Filter volume candle terhadap rata-rata 5 candle
+input double MinTickVolumeRatio=0.75; // Rasio volume minimal dibanding rata-rata 5 candle (0.75 = 75%)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
@@ -146,7 +150,9 @@ bool GSValidateSettings(string &reason)
       ReversalBufferATR<0.0 || ReversalBufferATR>1.0 ||
       ReversalRSIThreshold<0.0 || ReversalRSIThreshold>25.0 ||
       !GSPositive(PartialCloseTriggerATR) ||
-      PartialClosePct<=0.0 || PartialClosePct>=100.0)
+      PartialClosePct<=0.0 || PartialClosePct>=100.0 ||
+      MinCandleClosePercent<10.0 || MinCandleClosePercent>90.0 ||
+      MinTickVolumeRatio<0.1 || MinTickVolumeRatio>3.0)
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
   }

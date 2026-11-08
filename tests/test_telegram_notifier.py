@@ -360,6 +360,17 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("+15.20 USD", recap)
         self.assertIn("Status Robot: Berjalan Normal", recap)
 
+    def test_floating_drawdown_alert(self):
+        n = self.notifier()
+        n.poll()
+        acc = self.source / "account_live.csv"
+        acc.write_text("time_server,balance,equity,currency,open_positions\n2026.11.08 02:00:00,100000.0,99850.0,USD,1\n")
+        n.poll()
+        self.assertEqual(len(self.sent), 1)
+        self.assertIn("SIAGA FLOATING DRAWDOWN", self.sent[0])
+        self.assertIn("Floating Minus: -$150.00 USD", self.sent[0])
+        self.assertIn("Ekuitas Akun: $99,850.00 USD", self.sent[0])
+
 
 if __name__ == "__main__":
     unittest.main()

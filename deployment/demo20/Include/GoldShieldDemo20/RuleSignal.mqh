@@ -53,6 +53,33 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         }
      }
 
+   // Paket C: Filter arah & momentum candle M15
+   if(side!=0 && UseCandleDirectionFilter)
+     {
+      double range=data.bar.high-data.bar.low;
+      if(side==1)
+        {
+         if(data.bar.close<=data.bar.open)
+           { reason="HOLD_CANDLE_BEARISH"; return GS_HOLD; }
+         if(range>0.0 && (data.bar.close-data.bar.low)/range<MinCandleClosePercent/100.0)
+           { reason="HOLD_CANDLE_UPPER_WICK_REJECTION"; return GS_HOLD; }
+        }
+      else if(side==-1)
+        {
+         if(data.bar.close>=data.bar.open)
+           { reason="HOLD_CANDLE_BULLISH"; return GS_HOLD; }
+         if(range>0.0 && (data.bar.high-data.bar.close)/range<MinCandleClosePercent/100.0)
+           { reason="HOLD_CANDLE_LOWER_WICK_REJECTION"; return GS_HOLD; }
+        }
+     }
+
+   // Paket C: Filter volume transaksi (menghindari candle sepi / tipuan spread)
+   if(side!=0 && UseTickVolumeFilter)
+     {
+      if(data.avg_tick_volume>0.0 && (double)data.bar.tick_volume<data.avg_tick_volume*MinTickVolumeRatio)
+        { reason="HOLD_LOW_TICK_VOLUME"; return GS_HOLD; }
+     }
+
    if(side!=0 && SignalModel==GS_TREND_PULLBACK)
      {
       if(!GSTrendPullbackOK(side,data.bar.open,data.bar.close,data.previous.high,data.previous.low,

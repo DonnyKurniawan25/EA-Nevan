@@ -85,9 +85,14 @@ public:
          return GSReject(reason,"HOLD_DATA_INCOMPLETE");
       MqlRates rates[];
       ArraySetAsSeries(rates,true);
-      if(CopyRates(m_symbol,m_timeframe,1,2,rates)!=2)
+      int copied=CopyRates(m_symbol,m_timeframe,1,6,rates);
+      if(copied<2)
          return GSReject(reason,"HOLD_CLOSED_BARS_UNAVAILABLE");
       snapshot.bar=rates[0]; snapshot.previous=rates[1];
+      long sum_vol=0;
+      int count_vol=MathMin(copied,5);
+      for(int v=0;v<count_vol;v++) sum_vol+=rates[v].tick_volume;
+      snapshot.avg_tick_volume=(count_vol>0 ? (double)sum_vol/count_vol : (double)rates[0].tick_volume);
       snapshot.available_at_server=snapshot.bar.time+PeriodSeconds(m_timeframe);
       if(snapshot.bar.time<=snapshot.previous.time ||
          !GSValidOHLC(snapshot.bar.open,snapshot.bar.high,snapshot.bar.low,snapshot.bar.close) ||
