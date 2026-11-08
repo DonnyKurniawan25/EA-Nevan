@@ -217,23 +217,25 @@ void GSProcess(const bool evaluate_signal)
                               if(g_executor.ClosePartial(t,target_close,g_risk,g_log,p_reason))
                                 {
                                  g_storage.Set(partial_key,1.0);
-                                 double be_sl=NormalizeDouble(open_price+(p_type==POSITION_TYPE_BUY ? point : -point),digits);
+                                 double lock_p=(BreakEvenLockATR>0.0 && live_atr>0.0) ? (BreakEvenLockATR*live_atr) : point;
+                                 double be_sl=NormalizeDouble(open_price+(p_type==POSITION_TYPE_BUY ? lock_p : -lock_p),digits);
                                  string be_reason="";
                                  g_executor.ModifyStops(t,be_sl,current_tp,g_risk,g_log,be_reason,"PARTIAL_TP_BREAK_EVEN");
                                  current_sl=be_sl;
-                                }
-                             }
-                           else
-                             {
-                              g_storage.Set(partial_key,1.0);
-                              double be_sl=NormalizeDouble(open_price+(p_type==POSITION_TYPE_BUY ? point : -point),digits);
-                              if((p_type==POSITION_TYPE_BUY && current_sl<be_sl) || (p_type==POSITION_TYPE_SELL && (current_sl>be_sl || current_sl==0.0)))
-                                {
+                                 }
+                                 }
+                                 else
+                                 {
+                                 g_storage.Set(partial_key,1.0);
+                                 double lock_p=(BreakEvenLockATR>0.0 && live_atr>0.0) ? (BreakEvenLockATR*live_atr) : point;
+                                 double be_sl=NormalizeDouble(open_price+(p_type==POSITION_TYPE_BUY ? lock_p : -lock_p),digits);
+                                 if((p_type==POSITION_TYPE_BUY && current_sl<be_sl) || (p_type==POSITION_TYPE_SELL && (current_sl>be_sl || current_sl==0.0)))
+                                 {
                                  string be_reason="";
                                  g_executor.ModifyStops(t,be_sl,current_tp,g_risk,g_log,be_reason,"TP1_LOCK_BREAK_EVEN");
                                  current_sl=be_sl;
-                                }
-                             }
+                                 }
+                                 }
                           }
                        }
                     }
@@ -250,7 +252,8 @@ void GSProcess(const bool evaluate_signal)
                      bool be_trig=(live_atr>0.0) ? (p_tick.bid>=open_price+BreakEvenTriggerATR*live_atr) : (p_tick.bid>=open_price+spread*2.0 && current_profit>0.50);
                      if(be_trig)
                        {
-                        double new_sl=NormalizeDouble(open_price+point,digits);
+                        double lock_p=(BreakEvenLockATR>0.0 && live_atr>0.0) ? (BreakEvenLockATR*live_atr) : point;
+                        double new_sl=NormalizeDouble(open_price+lock_p,digits);
                         if(p_tick.bid-new_sl>=min_dist)
                           {
                            string mod_reason="";
@@ -302,7 +305,8 @@ void GSProcess(const bool evaluate_signal)
                      bool be_trig=(live_atr>0.0) ? (p_tick.ask<=open_price-BreakEvenTriggerATR*live_atr) : (p_tick.ask<=open_price-spread*2.0 && current_profit>0.50);
                      if(be_trig)
                        {
-                        double new_sl=NormalizeDouble(open_price-point,digits);
+                        double lock_p=(BreakEvenLockATR>0.0 && live_atr>0.0) ? (BreakEvenLockATR*live_atr) : point;
+                        double new_sl=NormalizeDouble(open_price-lock_p,digits);
                         if(new_sl-p_tick.ask>=min_dist)
                           {
                            string mod_reason="";
@@ -531,6 +535,35 @@ void GSProcess(const bool evaluate_signal)
               {
                side=GS_HOLD;
                reason="HOLD_OPPOSITE_DIRECTION_EXISTS";
+              }
+           }
+         if(side!=GS_HOLD && g_owned.count>0 && RequireProfitForAddOn)
+           {
+            for(int p_idx=PositionsTotal()-1; p_idx>=0; p_idx--)
+              {
+               ulong pos_t=PositionGetTicket(p_idx);
+               if(pos_t==0 || !PositionSelectByTicket(pos_t)) continue;
+               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+                 {
+                  double p_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+                  if(p_profit<=0.0)
+                    {
+                     side=GS_HOLD;
+                     reason="HOLD_ADDON_EXISTING_NOT_PROFITABLE";
+                     break;
+                    }
+                  if(MinAddOnDistanceATR>0.0 && GSPositive(data.atr))
+                    {
+                     double p_open=PositionGetDouble(POSITION_PRICE_OPEN);
+                     double dist=MathAbs(data.bar.close-p_open);
+                     if(dist<MinAddOnDistanceATR*data.atr)
+                       {
+                        side=GS_HOLD;
+                        reason="HOLD_ADDON_TOO_CLOSE";
+                        break;
+                       }
+                    }
+                 }
               }
            }
          if((tick.ask-tick.bid)/g_symbol.point>MaxAllowedSpreadPoints)

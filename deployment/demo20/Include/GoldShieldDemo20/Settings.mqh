@@ -18,7 +18,7 @@ input group "CLOSED CANDLE RULES - baseline teknis"
 input GSSignalModel SignalModel=GS_BASELINE; // Experimental confirmation did not pass comparative testing.
 input bool UseHTFTrendFilter=true; // Multi-timeframe trend filter (H1 EMA confirmation)
 input ENUM_TIMEFRAMES TrendTimeframe=PERIOD_H1;
-input double MaxEntryStretchATR=1.0;
+input double MaxEntryStretchATR=1.2; // Batas toleransi jarak harga ke EMA (anti-pucuk/lembah)
 input int FastEMAPeriod=20;
 input int SlowEMAPeriod=50;
 input int RSIPeriod=14;
@@ -29,7 +29,7 @@ input double ADXThreshold=22.0; // Minimum ADX level to permit entry (below=side
 input int ATRPeriod=14;
 input int MinClosedBars=250;
 input double StopATRMultiple=2.0;
-input double RewardRiskMultiple=2.0;
+input double RewardRiskMultiple=1.25; // Rasio TP terhadap SL (1.25 = 2.5 ATR target TP runner saat Stop 2.0 ATR)
 input double MaxCandleATRMultiple=3.0;
 input double MaxGapATRMultiple=1.0;
 input int MaxSignalAgeSeconds=120;
@@ -37,6 +37,7 @@ input int MaxHoldMinutes=0; // Auto-close profitable trade after N minutes (0=di
 input bool UseEarlyReversalExit=true; // Close position early if M15 candle confirms trend reversal
 input bool UseBreakEvenProtection=true; // Protect capital once trade enters profit
 input double BreakEvenTriggerATR=1.0; // Profit distance in ATR to activate break-even guard
+input double BreakEvenLockATR=0.20; // Nominal profit yang dikunci saat Break-Even dalam satuan ATR (0.20 ATR)
 input bool UseTrailingStop=true; // Dynamic ATR trailing stop after break-even
 input double TrailingStopATR=1.0; // Trailing stop distance behind price in ATR multiples
 input double TrailingStepATR=0.3; // Minimum profit advance in ATR to move trailing stop
@@ -50,10 +51,13 @@ input bool UseCandleDirectionFilter=true; // Sinyal wajib searah candle M15 (BUY
 input double MinCandleClosePercent=50.0; // Tutup candle minimal di 50% range atas (BUY) atau bawah (SELL)
 input bool UseTickVolumeFilter=true; // Filter volume candle terhadap rata-rata 5 candle
 input double MinTickVolumeRatio=0.75; // Rasio volume minimal dibanding rata-rata 5 candle (0.75 = 75%)
+input double MaxTickVolumeRatio=3.0; // Batas atas rasio volume tick terhadap rata-rata (menolak climax / stop-hunt)
 input bool UseFridayCloseGuard=true; // Tutup posisi otomatis sebelum bursa Jumat tutup (hindari weekend gap)
 input int FridayCloseHourServer=23; // Jam server untuk auto-close Jumat
 input int FridayCloseMinuteServer=45; // Menit server untuk auto-close Jumat
 input bool RequireSameDirectionMulti=true; // Posisi tambahan (multi-posisi) wajib searah, tolak hedging
+input bool RequireProfitForAddOn=true; // Posisi tambahan (multi-posisi) wajib menunggu posisi aktif untung
+input double MinAddOnDistanceATR=0.8; // Jarak minimal harga saat ini dari entry posisi aktif dalam ATR
 input bool UseMinATRFilter=true; // Tolak entri jika ATR terlalu kecil (pasar mati / likuiditas nol)
 input double MinATRPoints=20.0; // Batas minimal ATR dalam points
 input double EMAPenetrationBufferATR=0.10; // Buffer penetrasi harga terhadap EMA (0.10 = 10% ATR)
@@ -169,6 +173,9 @@ bool GSValidateSettings(string &reason)
       PartialClosePct<=0.0 || PartialClosePct>=100.0 ||
       MinCandleClosePercent<10.0 || MinCandleClosePercent>90.0 ||
       MinTickVolumeRatio<0.1 || MinTickVolumeRatio>3.0 ||
+      MaxTickVolumeRatio<0.0 || MaxTickVolumeRatio>10.0 ||
+      BreakEvenLockATR<0.0 || BreakEvenLockATR>1.0 ||
+      MinAddOnDistanceATR<0.0 || MinAddOnDistanceATR>5.0 ||
       FridayCloseHourServer<0 || FridayCloseHourServer>23 ||
       FridayCloseMinuteServer<0 || FridayCloseMinuteServer>59 ||
       MinATRPoints<0.0 || EMAPenetrationBufferATR<0.0 || EMAPenetrationBufferATR>1.0 ||

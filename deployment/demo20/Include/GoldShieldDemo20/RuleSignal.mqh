@@ -42,6 +42,14 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_EMA_PENETRATION_INSUFFICIENT"; return GS_HOLD; }
      }
 
+   // Filter anti-chasing: tolak entry jika harga sudah lonjak terlalu jauh dari EMA (pucuk/lembah)
+   if(side!=0 && GSPositive(MaxEntryStretchATR) && GSPositive(data.atr))
+     {
+      double max_stretch=data.atr*MaxEntryStretchATR;
+      if(MathAbs(data.bar.close-data.fast_ema)>max_stretch)
+        { reason="HOLD_PRICE_OVEREXTENDED"; return GS_HOLD; }
+     }
+
    if(side!=0 && RequireFreshCross)
      {
       bool fresh_buy=(data.previous_fast_ema<=data.previous_slow_ema && data.fast_ema>data.slow_ema) ||
@@ -100,6 +108,8 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
      {
       if(data.avg_tick_volume>0.0 && (double)data.bar.tick_volume<data.avg_tick_volume*MinTickVolumeRatio)
         { reason="HOLD_LOW_TICK_VOLUME"; return GS_HOLD; }
+      if(MaxTickVolumeRatio>0.0 && data.avg_tick_volume>0.0 && (double)data.bar.tick_volume>data.avg_tick_volume*MaxTickVolumeRatio)
+        { reason="HOLD_VOLUME_CLIMAX"; return GS_HOLD; }
      }
 
    if(side!=0 && SignalModel==GS_TREND_PULLBACK)
