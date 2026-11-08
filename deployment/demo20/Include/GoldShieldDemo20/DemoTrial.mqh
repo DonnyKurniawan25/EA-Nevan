@@ -143,6 +143,63 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
                 AccountInfoString(ACCOUNT_CURRENCY),IntegerToString(owned.count));
       FileFlush(acc_file); FileClose(acc_file);
      }
+
+   int pos_file=FileOpen("GoldShield\\positions_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
+   if(pos_file!=INVALID_HANDLE)
+     {
+      FileWrite(pos_file,"ticket","symbol","type","volume","open_price","current_price","sl","tp","profit");
+      for(int p=PositionsTotal()-1;p>=0;p--)
+        {
+         ulong pt=PositionGetTicket(p);
+         if(pt>0 && PositionSelectByTicket(pt))
+           {
+            if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+              {
+               FileWrite(pos_file,IntegerToString(pt),
+                         PositionGetString(POSITION_SYMBOL),
+                         ((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? "BUY" : "SELL"),
+                         DoubleToString(PositionGetDouble(POSITION_VOLUME),2),
+                         DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_SL),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_TP),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2));
+              }
+           }
+        }
+      FileFlush(pos_file); FileClose(pos_file);
+     }
+
+   int deal_file=FileOpen("GoldShield\\history_deals.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
+   if(deal_file!=INVALID_HANDLE)
+     {
+      FileWrite(deal_file,"deal","order","time","symbol","type","entry","volume","price","profit","comment");
+      if(HistorySelect(TimeTradeServer()-86400*7,TimeTradeServer()+60))
+        {
+         for(int h=HistoryDealsTotal()-1;h>=0;h--)
+           {
+            ulong dt=HistoryDealGetTicket(h);
+            if(dt>0 && HistoryDealGetString(dt,DEAL_SYMBOL)==TradeSymbol && (ulong)HistoryDealGetInteger(dt,DEAL_MAGIC)==MagicNumber)
+              {
+               ENUM_DEAL_ENTRY d_entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(dt,DEAL_ENTRY);
+               if(d_entry==DEAL_ENTRY_OUT || d_entry==DEAL_ENTRY_IN)
+                 {
+                  FileWrite(deal_file,IntegerToString(dt),
+                            IntegerToString(HistoryDealGetInteger(dt,DEAL_ORDER)),
+                            TimeToString((datetime)HistoryDealGetInteger(dt,DEAL_TIME),TIME_DATE|TIME_SECONDS),
+                            HistoryDealGetString(dt,DEAL_SYMBOL),
+                            ((ENUM_DEAL_TYPE)HistoryDealGetInteger(dt,DEAL_TYPE)==DEAL_TYPE_BUY ? "BUY" : "SELL"),
+                            (d_entry==DEAL_ENTRY_OUT ? "OUT" : "IN"),
+                            DoubleToString(HistoryDealGetDouble(dt,DEAL_VOLUME),2),
+                            DoubleToString(HistoryDealGetDouble(dt,DEAL_PRICE),_Digits),
+                            DoubleToString(HistoryDealGetDouble(dt,DEAL_PROFIT)+HistoryDealGetDouble(dt,DEAL_SWAP),2),
+                            HistoryDealGetString(dt,DEAL_COMMENT));
+                 }
+              }
+           }
+        }
+      FileFlush(deal_file); FileClose(deal_file);
+     }
    if(used>=GS_DEMO20_LIMIT && closed>=GS_DEMO20_LIMIT && owned.count==0) complete=true;
   }
 #endif
