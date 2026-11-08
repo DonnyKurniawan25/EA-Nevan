@@ -49,6 +49,7 @@ EVENT_ICONS = {
     "INIT_FAILED": "❌",
     "TIME_PROFIT_EXIT": "🎯",
     "EARLY_REVERSAL_EXIT": "⚠️",
+    "PARTIAL_CLOSE": "🎯",
     "STOP_MODIFY": "🛡️",
     "STATE": "ℹ️",
 }
@@ -58,6 +59,10 @@ REASON_DESCRIPTIONS = {
     "HOLD_DURATION_TARGET_UNREACHED": "Target waktu tahan selesai saat posisi untung",
     "TREND_INVALIDATED_CUT_LOSS": "Pembalikan tren terdeteksi (cut loss dini)",
     "BREAK_EVEN": "Proteksi modal: Stop Loss digeser ke harga modal",
+    "TAKE_PROFIT_1": "Target keuntungan 1 tercapai (50% posisi ditutup & profit diamankan)",
+    "PARTIAL_TP_BREAK_EVEN": "Proteksi modal: Stop Loss sisa posisi digeser ke harga modal",
+    "TP1_LOCK_BREAK_EVEN": "Target keuntungan 1 tercapai: Stop Loss dikunci ke harga modal",
+    "HOLD_NO_FRESH_TRIGGER": "Bukan pemicu segar (mencegah entri di pucuk tren lama)",
     "TRAILING_STOP": "Trailing Stop aktif (mengunci keuntungan bertahap)",
     "BROKER_SNAPSHOT_EMPTY": "Posisi selesai ditutup di broker",
     "BROKER_POSITION_PRESENT": "Posisi aktif di broker",
@@ -89,6 +94,7 @@ KEY_TRANSLATIONS = {
     "budget": "Alokasi Modal",
     "risk_est": "Estimasi Risiko",
     "margin_est": "Estimasi Margin",
+    "close_vol": "Volume Ditutup",
     "adx": "Kekuatan Tren (ADX)",
 }
 
@@ -143,7 +149,7 @@ def audit_message(row):
         reason_text = reason
 
     formatted_vals = []
-    for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|profit|adx|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
+    for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|profit|adx|close_vol|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
         lbl = KEY_TRANSLATIONS.get(key, key)
         if key == "retcode" and value == "10009":
             formatted_vals.append(f"• {lbl}: 10009 (Sukses)")

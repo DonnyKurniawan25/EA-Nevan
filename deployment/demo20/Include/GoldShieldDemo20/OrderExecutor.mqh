@@ -119,6 +119,26 @@ public:
       reason="CLOSE_REQUEST_SENT_RECONCILE";
       return sent;
      }
+   bool ClosePartial(const ulong ticket,const double volume,GSRiskFirewall &risk,GSMetrics &log,string &reason)
+     {
+      if(!risk.CanManage(reason)) return false;
+      if(!PositionSelectByTicket(ticket)) return GSReject(reason,"CLOSE_TICKET_NO_LONGER_PRESENT");
+      if(PositionGetString(POSITION_SYMBOL)!=TradeSymbol ||
+         (ulong)PositionGetInteger(POSITION_MAGIC)!=MagicNumber ||
+         StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
+         return GSReject(reason,"CLOSE_OWNERSHIP_REJECTED");
+      double cur_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+      GSSymbolSpec spec;
+      if(!spec.Load(TradeSymbol,reason)) return false;
+      ENUM_ORDER_TYPE_FILLING filling;
+      if(!spec.Filling(filling,reason)) return false;
+      m_trade.SetTypeFilling(filling);
+      bool sent=m_trade.PositionClosePartial(ticket,volume,(ulong)MaxDeviationPoints);
+      log.Event("PARTIAL_CLOSE","TAKE_PROFIT_1",StringFormat("ticket=%I64u close_vol=%.2f method=%s retcode=%u deal=%I64u profit=%.2f",
+                ticket,volume,(sent ? "true" : "false"),m_trade.ResultRetcode(),m_trade.ResultDeal(),cur_profit));
+      reason="PARTIAL_CLOSE_SENT";
+      return sent;
+     }
    bool ModifyStops(const ulong ticket,const double sl,const double tp,GSRiskFirewall &risk,GSMetrics &log,string &reason,const string modify_reason="BREAK_EVEN")
      {
       if(!risk.CanManage(reason)) return false;

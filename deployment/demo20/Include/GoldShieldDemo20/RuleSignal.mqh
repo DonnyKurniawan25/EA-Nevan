@@ -24,6 +24,18 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
 
    int side=GSBaselineSide(data.bar.close,data.fast_ema,data.slow_ema,data.rsi,UseRSIFilter);
 
+   if(side!=0 && RequireFreshCross)
+     {
+      bool fresh_buy=(data.previous_fast_ema<=data.previous_slow_ema && data.fast_ema>data.slow_ema) ||
+                     (data.previous.close<=data.previous_fast_ema && data.bar.close>data.fast_ema);
+      bool fresh_sell=(data.previous_fast_ema>=data.previous_slow_ema && data.fast_ema<data.slow_ema) ||
+                      (data.previous.close>=data.previous_fast_ema && data.bar.close<data.fast_ema);
+      if(side==1 && !fresh_buy)
+        { reason="HOLD_NO_FRESH_TRIGGER"; return GS_HOLD; }
+      if(side==-1 && !fresh_sell)
+        { reason="HOLD_NO_FRESH_TRIGGER"; return GS_HOLD; }
+     }
+
    // Prioritas 2: Multi-Timeframe Trend Filter (M15 + H1 EMA)
    if(side!=0 && UseHTFTrendFilter)
      {

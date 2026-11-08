@@ -26,6 +26,7 @@ private:
      }
 public:
    GSStorage(void) { m_lock=INVALID_HANDLE; }
+   bool Set(const string suffix,const double value) { return Put(suffix,value); }
    string Key(void) { return m_key; }
    double Get(const string suffix)
      {

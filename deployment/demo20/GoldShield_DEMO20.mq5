@@ -136,8 +136,8 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
-   // Rule 2: Break-Even Protection (Kunci Modal) & Dynamic ATR Trailing Stop
-   if((UseBreakEvenProtection || UseTrailingStop) && g_owned.count>0)
+   // Rule 2: Partial Take Profit, Break-Even Protection & Dynamic ATR Trailing Stop
+   if((UseBreakEvenProtection || UseTrailingStop || UsePartialTakeProfit) && g_owned.count>0)
      {
       GSMarketSnapshot data;
       string m_reason="";
@@ -161,6 +161,51 @@ void GSProcess(const bool evaluate_signal)
                double point=SymbolInfoDouble(TradeSymbol,SYMBOL_POINT);
                double spread=SymbolInfoInteger(TradeSymbol,SYMBOL_SPREAD)*point;
                int digits=(int)SymbolInfoInteger(TradeSymbol,SYMBOL_DIGITS);
+
+               // 0. Partial Take Profit Check (TP 1 di +1.0 ATR)
+               if(UsePartialTakeProfit && live_atr>0.0)
+                 {
+                  string partial_key=StringFormat(".partial_%I64u",t);
+                  if(g_storage.Get(partial_key)==0.0)
+                    {
+                     double gain=(p_type==POSITION_TYPE_BUY ? p_tick.bid-open_price : open_price-p_tick.ask);
+                     if(gain>=PartialCloseTriggerATR*live_atr)
+                       {
+                        double cur_vol=PositionGetDouble(POSITION_VOLUME);
+                        GSSymbolSpec spec;
+                        string spec_err="";
+                        if(spec.Load(TradeSymbol,spec_err))
+                          {
+                           double step=spec.volume_step;
+                           double min_v=spec.volume_min;
+                           double target_close=MathFloor((cur_vol*(PartialClosePct/100.0))/step)*step;
+                           if(target_close>=min_v && cur_vol-target_close>=min_v)
+                             {
+                              string p_reason="";
+                              if(g_executor.ClosePartial(t,target_close,g_risk,g_log,p_reason))
+                                {
+                                 g_storage.Set(partial_key,1.0);
+                                 double be_sl=NormalizeDouble(open_price+(p_type==POSITION_TYPE_BUY ? point : -point),digits);
+                                 string be_reason="";
+                                 g_executor.ModifyStops(t,be_sl,current_tp,g_risk,g_log,be_reason,"PARTIAL_TP_BREAK_EVEN");
+                                 current_sl=be_sl;
+                                }
+                             }
+                           else
+                             {
+                              g_storage.Set(partial_key,1.0);
+                              double be_sl=NormalizeDouble(open_price+(p_type==POSITION_TYPE_BUY ? point : -point),digits);
+                              if((p_type==POSITION_TYPE_BUY && current_sl<be_sl) || (p_type==POSITION_TYPE_SELL && (current_sl>be_sl || current_sl==0.0)))
+                                {
+                                 string be_reason="";
+                                 g_executor.ModifyStops(t,be_sl,current_tp,g_risk,g_log,be_reason,"TP1_LOCK_BREAK_EVEN");
+                                 current_sl=be_sl;
+                                }
+                             }
+                          }
+                       }
+                    }
+                 }
                if(p_type==POSITION_TYPE_BUY)
                  {
                   // 1. Break-Even Check
@@ -240,18 +285,20 @@ void GSProcess(const bool evaluate_signal)
                string exit_detail="";
                if(p_type==POSITION_TYPE_BUY)
                  {
-                  if(data.bar.close<data.fast_ema || data.rsi<45.0)
+                  if((data.bar.close<data.fast_ema-data.atr*ReversalBufferATR) ||
+                     (data.rsi<50.0-ReversalRSIThreshold))
                     {
                      should_exit_early=true;
-                     exit_detail=StringFormat("BUY_REVERSAL close=%.2f ema=%.2f rsi=%.2f",data.bar.close,data.fast_ema,data.rsi);
+                     exit_detail=StringFormat("BUY_REVERSAL close=%.2f ema=%.2f rsi=%.2f buf=%.2f",data.bar.close,data.fast_ema,data.rsi,data.atr*ReversalBufferATR);
                     }
                  }
                else if(p_type==POSITION_TYPE_SELL)
                  {
-                  if(data.bar.close>data.fast_ema || data.rsi>55.0)
+                  if((data.bar.close>data.fast_ema+data.atr*ReversalBufferATR) ||
+                     (data.rsi>50.0+ReversalRSIThreshold))
                     {
                      should_exit_early=true;
-                     exit_detail=StringFormat("SELL_REVERSAL close=%.2f ema=%.2f rsi=%.2f",data.bar.close,data.fast_ema,data.rsi);
+                     exit_detail=StringFormat("SELL_REVERSAL close=%.2f ema=%.2f rsi=%.2f buf=%.2f",data.bar.close,data.fast_ema,data.rsi,data.atr*ReversalBufferATR);
                     }
                  }
                if(should_exit_early)

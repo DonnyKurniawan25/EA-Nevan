@@ -40,6 +40,12 @@ input double BreakEvenTriggerATR=1.0; // Profit distance in ATR to activate brea
 input bool UseTrailingStop=true; // Dynamic ATR trailing stop after break-even
 input double TrailingStopATR=1.0; // Trailing stop distance behind price in ATR multiples
 input double TrailingStepATR=0.3; // Minimum profit advance in ATR to move trailing stop
+input double ReversalBufferATR=0.20; // Toleransi buffer penembusan EMA sebelum cut loss (0.20 = 20% ATR)
+input double ReversalRSIThreshold=12.0; // Deviasi RSI dari batas netral 50 (BUY cut jika RSI < 38, SELL cut jika RSI > 62)
+input bool UsePartialTakeProfit=true; // Amankan profit sebagian di TP 1
+input double PartialCloseTriggerATR=1.0; // Jarak profit untuk memicu partial close (1.0 = 1.0 ATR)
+input double PartialClosePct=50.0; // Persentase volume yang ditutup di TP 1 (default 50%)
+input bool RequireFreshCross=false; // Hanya masuk saat bar baru saja crossover (opsional filter pucuk)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
@@ -132,7 +138,11 @@ bool GSValidateSettings(string &reason)
       !GSPositive(MaxSpreadATRMultiple) || MaxSpreadATRMultiple>2.0 ||
       RolloverStartMinute<0 || RolloverStartMinute>59 ||
       RolloverEndMinute<0 || RolloverEndMinute>59 ||
-      MaxDynamicEntriesPerDay<1 || MaxDynamicEntriesPerDay>50)
+      MaxDynamicEntriesPerDay<1 || MaxDynamicEntriesPerDay>50 ||
+      ReversalBufferATR<0.0 || ReversalBufferATR>1.0 ||
+      ReversalRSIThreshold<0.0 || ReversalRSIThreshold>25.0 ||
+      !GSPositive(PartialCloseTriggerATR) ||
+      PartialClosePct<=0.0 || PartialClosePct>=100.0)
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
   }
