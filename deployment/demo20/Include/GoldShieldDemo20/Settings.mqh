@@ -33,7 +33,7 @@ input double RewardRiskMultiple=2.0;
 input double MaxCandleATRMultiple=3.0;
 input double MaxGapATRMultiple=1.0;
 input int MaxSignalAgeSeconds=120;
-input int MaxHoldMinutes=30; // Auto-close profitable trade after N minutes (0=disabled)
+input int MaxHoldMinutes=0; // Auto-close profitable trade after N minutes (0=disabled, dynamic market-based exit)
 input bool UseEarlyReversalExit=true; // Close position early if M15 candle confirms trend reversal
 input bool UseBreakEvenProtection=true; // Protect capital once trade enters profit
 input double BreakEvenTriggerATR=1.0; // Profit distance in ATR to activate break-even guard
@@ -43,7 +43,7 @@ input double TrailingStepATR=0.3; // Minimum profit advance in ATR to move trail
 input double ReversalBufferATR=0.20; // Toleransi buffer penembusan EMA sebelum cut loss (0.20 = 20% ATR)
 input double ReversalRSIThreshold=12.0; // Deviasi RSI dari batas netral 50 (BUY cut jika RSI < 38, SELL cut jika RSI > 62)
 input bool UsePartialTakeProfit=true; // Amankan profit sebagian di TP 1
-input double PartialCloseTriggerATR=1.0; // Jarak profit untuk memicu partial close (1.0 = 1.0 ATR)
+input double PartialCloseTriggerATR=1.5; // Jarak profit untuk memicu partial close (1.5 = 1.5 ATR)
 input double PartialClosePct=50.0; // Persentase volume yang ditutup di TP 1 (default 50%)
 input bool RequireFreshCross=false; // Hanya masuk saat bar baru saja crossover (opsional filter pucuk)
 input bool UseCandleDirectionFilter=true; // Sinyal wajib searah candle M15 (BUY hijau, SELL merah)
@@ -68,9 +68,9 @@ input double PartialTrailingATR=0.7; // Jarak trailing runner pasca TP 1 dalam k
 input bool RequireHTFSlopeAlignment=true; // Kemiringan EMA tren H1 wajib searah (bukan datar)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
-input double BaseLot=0.01; // Maximum requested volume; never rounded up.
+input double BaseLot=0.05; // Maximum requested volume; never rounded up.
 input bool   UseAutoLotByRisk=false; // Hitung lot dinamis berbasis toleransi risiko modal (MaxRiskPerTradePct & jarak SL)
-input double MaxLotPerTrade=0.02;    // Batas lot maksimum per posisi saat UseAutoLotByRisk aktif
+input double MaxLotPerTrade=0.05;    // Batas lot maksimum per posisi saat UseAutoLotByRisk aktif
 input double MaxRiskPerTradePct=0.5;
 input double MaxAggregateOpenRiskPct=1.0;
 input double MaxTotalAccountLots=0.10; // Raw lots summed across account; not equivalent notionals.
