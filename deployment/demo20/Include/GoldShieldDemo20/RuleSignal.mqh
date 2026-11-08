@@ -12,7 +12,35 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
       MathAbs(data.bar.open-data.previous.close)>data.atr*MaxGapATRMultiple ||
       MathAbs(tick.bid-data.bar.close)>data.atr*MaxGapATRMultiple)
      { reason="HOLD_VOLATILITY_OR_GAP"; return GS_HOLD; }
+
+   // Prioritas 2: Filter sideways / konsolidasi via ADX
+   if(UseADXFilter)
+     {
+      if(!MathIsValidNumber(data.adx) || data.adx<0.0)
+        { reason="HOLD_ADX_DATA_INVALID"; return GS_HOLD; }
+      if(data.adx<ADXThreshold)
+        { reason="HOLD_ADX_SIDEWAYS"; return GS_HOLD; }
+     }
+
    int side=GSBaselineSide(data.bar.close,data.fast_ema,data.slow_ema,data.rsi,UseRSIFilter);
+
+   // Prioritas 2: Multi-Timeframe Trend Filter (M15 + H1 EMA)
+   if(side!=0 && UseHTFTrendFilter)
+     {
+      if(!GSPositive(data.trend_close) || !GSPositive(data.trend_fast_ema) || !GSPositive(data.trend_slow_ema))
+        { reason="HOLD_HTF_DATA_INVALID"; return GS_HOLD; }
+      if(side==1)
+        {
+         if(data.trend_close<data.trend_slow_ema || data.trend_fast_ema<data.trend_slow_ema)
+           { reason="HOLD_HTF_TREND_BEARISH"; return GS_HOLD; }
+        }
+      else if(side==-1)
+        {
+         if(data.trend_close>data.trend_slow_ema || data.trend_fast_ema>data.trend_slow_ema)
+           { reason="HOLD_HTF_TREND_BULLISH"; return GS_HOLD; }
+        }
+     }
+
    if(side!=0 && SignalModel==GS_TREND_PULLBACK)
      {
       if(!GSTrendPullbackOK(side,data.bar.open,data.bar.close,data.previous.high,data.previous.low,

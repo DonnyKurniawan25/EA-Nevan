@@ -16,12 +16,16 @@ input string RequiredAccountCurrency=""; // A Cent preset refuses a USD Standard
 
 input group "CLOSED CANDLE RULES - baseline teknis"
 input GSSignalModel SignalModel=GS_BASELINE; // Experimental confirmation did not pass comparative testing.
+input bool UseHTFTrendFilter=true; // Multi-timeframe trend filter (H1 EMA confirmation)
 input ENUM_TIMEFRAMES TrendTimeframe=PERIOD_H1;
 input double MaxEntryStretchATR=1.0;
 input int FastEMAPeriod=20;
 input int SlowEMAPeriod=50;
 input int RSIPeriod=14;
 input bool UseRSIFilter=true;
+input bool UseADXFilter=true; // Sideways chop filter via ADX
+input int ADXPeriod=14; // ADX period
+input double ADXThreshold=22.0; // Minimum ADX level to permit entry (below=sideways)
 input int ATRPeriod=14;
 input int MinClosedBars=250;
 input double StopATRMultiple=2.0;
@@ -90,8 +94,10 @@ bool GSValidateSettings(string &reason)
       return GSReject(reason,"INVALID_INDICATOR_SETTINGS");
    if((SignalModel!=GS_BASELINE && SignalModel!=GS_TREND_PULLBACK) ||
       !GSPositive(MaxEntryStretchATR) ||
-      (SignalModel==GS_TREND_PULLBACK && PeriodSeconds(TrendTimeframe)<=PeriodSeconds(SignalTimeframe)))
+      ((SignalModel==GS_TREND_PULLBACK || UseHTFTrendFilter) && PeriodSeconds(TrendTimeframe)<=PeriodSeconds(SignalTimeframe)))
       return GSReject(reason,"INVALID_TREND_CONFIRMATION_SETTINGS");
+   if(UseADXFilter && (ADXPeriod<2 || !GSPositive(ADXThreshold) || ADXThreshold>100.0))
+      return GSReject(reason,"INVALID_ADX_SETTINGS");
    if(!GSPositive(MaxDailyLossPct) || MaxDailyLossPct>1.0 ||
       !GSPositive(MaxWeeklyLossPct) || MaxWeeklyLossPct>2.0 || MaxDailyLossPct>MaxWeeklyLossPct ||
       MaxConsecutiveLossesPerDay<1 || MaxEntriesPerDay<1 || MaxEntriesPerDay>20)

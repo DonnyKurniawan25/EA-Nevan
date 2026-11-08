@@ -367,9 +367,9 @@ void GSProcess(const bool evaluate_signal)
          if((tick.ask-tick.bid)/g_symbol.point>MaxAllowedSpreadPoints)
            { side=GS_HOLD; reason="HOLD_SPREAD_LIMIT"; }
          g_signal=EnumToString(side)+" "+reason;
-         g_log.Event("SIGNAL",reason,StringFormat("%s model=%s close=%.5f fast=%.5f slow=%.5f rsi=%.2f atr=%.5f htf_close=%.5f htf_fast=%.5f htf_slow=%.5f htf_available=%I64d",
+         g_log.Event("SIGNAL",reason,StringFormat("%s model=%s close=%.5f fast=%.5f slow=%.5f rsi=%.2f atr=%.5f adx=%.2f htf_close=%.5f htf_fast=%.5f htf_slow=%.5f htf_available=%I64d",
                      EnumToString(side),EnumToString(SignalModel),data.bar.close,data.fast_ema,data.slow_ema,
-                     data.rsi,data.atr,data.trend_close,data.trend_fast_ema,data.trend_slow_ema,
+                     data.rsi,data.atr,data.adx,data.trend_close,data.trend_fast_ema,data.trend_slow_ema,
                      (long)data.trend_available_at_server),data.bar.time);
          if(side==GS_HOLD)
             g_state.Set((reason=="HOLD_VOLATILITY_OR_GAP" ? PAUSED_VOLATILITY : READY),reason,g_log);
@@ -421,8 +421,9 @@ int OnInit(void)
    if(!GSDemo20Init(g_storage,TradeSymbol,MagicNumber,reason)) { Print("DEMO20 INIT: ",reason); return INIT_FAILED; }
    if(!g_log.Init(g_storage.Key())) { Print("GOLDSHIELD INIT: AUDIT_FILE_UNAVAILABLE"); return INIT_FAILED; }
    g_state.Set(RECOVERY,"RECONCILE_BROKER_BEFORE_SIGNALS",g_log);
+   bool need_htf=(SignalModel==GS_TREND_PULLBACK || UseHTFTrendFilter);
    if(!g_market.Init(TradeSymbol,SignalTimeframe,FastEMAPeriod,SlowEMAPeriod,RSIPeriod,ATRPeriod,
-                     SignalModel==GS_TREND_PULLBACK,TrendTimeframe))
+                     need_htf,TrendTimeframe,UseADXFilter,ADXPeriod))
      { g_log.Event("INIT_FAILED","INDICATOR_HANDLE_ERROR"); return INIT_FAILED; }
    g_executor.Init();
    g_research_first=TimeCurrent();

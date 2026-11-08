@@ -7,8 +7,10 @@ class GSMarketData
   {
 private:
    int m_fast,m_slow,m_rsi,m_atr;
+   int m_adx;
    int m_trend_fast,m_trend_slow;
    bool m_confirm;
+   bool m_use_adx;
    ENUM_TIMEFRAMES m_trend_timeframe;
    string m_symbol;
    ENUM_TIMEFRAMES m_timeframe;
@@ -30,18 +32,26 @@ public:
    GSMarketData(void)
      {
       m_fast=INVALID_HANDLE; m_slow=INVALID_HANDLE; m_rsi=INVALID_HANDLE; m_atr=INVALID_HANDLE;
-      m_trend_fast=INVALID_HANDLE; m_trend_slow=INVALID_HANDLE; m_confirm=false;
+      m_adx=INVALID_HANDLE;
+      m_trend_fast=INVALID_HANDLE; m_trend_slow=INVALID_HANDLE; m_confirm=false; m_use_adx=false;
      }
    bool Init(const string symbol,const ENUM_TIMEFRAMES timeframe,
              const int fast,const int slow,const int rsi,const int atr,
-             const bool confirm,const ENUM_TIMEFRAMES trend_timeframe)
+             const bool confirm,const ENUM_TIMEFRAMES trend_timeframe,
+             const bool use_adx=false,const int adx_period=14)
      {
       m_symbol=symbol; m_timeframe=timeframe;
       m_confirm=confirm; m_trend_timeframe=trend_timeframe;
+      m_use_adx=use_adx;
       m_fast=iMA(symbol,timeframe,fast,0,MODE_EMA,PRICE_CLOSE);
       m_slow=iMA(symbol,timeframe,slow,0,MODE_EMA,PRICE_CLOSE);
       m_rsi=iRSI(symbol,timeframe,rsi,PRICE_CLOSE);
       m_atr=iATR(symbol,timeframe,atr);
+      if(m_use_adx)
+        {
+         m_adx=iADX(symbol,timeframe,adx_period);
+         if(m_adx==INVALID_HANDLE) return false;
+        }
       if(m_confirm)
         {
          m_trend_fast=iMA(symbol,trend_timeframe,fast,0,MODE_EMA,PRICE_CLOSE);
@@ -57,9 +67,11 @@ public:
       if(m_slow!=INVALID_HANDLE) IndicatorRelease(m_slow);
       if(m_rsi!=INVALID_HANDLE) IndicatorRelease(m_rsi);
       if(m_atr!=INVALID_HANDLE) IndicatorRelease(m_atr);
+      if(m_adx!=INVALID_HANDLE) IndicatorRelease(m_adx);
       if(m_trend_fast!=INVALID_HANDLE) IndicatorRelease(m_trend_fast);
       if(m_trend_slow!=INVALID_HANDLE) IndicatorRelease(m_trend_slow);
       m_fast=INVALID_HANDLE; m_slow=INVALID_HANDLE; m_rsi=INVALID_HANDLE; m_atr=INVALID_HANDLE;
+      m_adx=INVALID_HANDLE;
       m_trend_fast=INVALID_HANDLE; m_trend_slow=INVALID_HANDLE;
      }
    bool Read(const int minimum_bars,GSMarketSnapshot &snapshot,string &reason)
@@ -68,7 +80,8 @@ public:
       if(!SeriesInfoInteger(m_symbol,m_timeframe,SERIES_SYNCHRONIZED) ||
          Bars(m_symbol,m_timeframe)<minimum_bars+1 ||
          BarsCalculated(m_fast)<minimum_bars || BarsCalculated(m_slow)<minimum_bars ||
-         BarsCalculated(m_rsi)<minimum_bars || BarsCalculated(m_atr)<minimum_bars)
+         BarsCalculated(m_rsi)<minimum_bars || BarsCalculated(m_atr)<minimum_bars ||
+         (m_use_adx && BarsCalculated(m_adx)<minimum_bars))
          return GSReject(reason,"HOLD_DATA_INCOMPLETE");
       MqlRates rates[];
       ArraySetAsSeries(rates,true);
@@ -86,6 +99,12 @@ public:
          !GSPositive(snapshot.fast_ema) || !GSPositive(snapshot.slow_ema) ||
          !GSPositive(snapshot.atr) || snapshot.rsi<0.0 || snapshot.rsi>100.0)
          return GSReject(reason,"HOLD_INVALID_INDICATOR");
+      if(m_use_adx)
+        {
+         if(!ReadValue(m_adx,snapshot.adx) || !MathIsValidNumber(snapshot.adx) ||
+            snapshot.adx<0.0 || snapshot.adx>100.0)
+            return GSReject(reason,"HOLD_INVALID_ADX");
+        }
       if(m_confirm)
         {
          if(!SeriesInfoInteger(m_symbol,m_trend_timeframe,SERIES_SYNCHRONIZED) ||

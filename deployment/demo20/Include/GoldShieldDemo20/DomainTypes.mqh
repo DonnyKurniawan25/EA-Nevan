@@ -24,6 +24,7 @@ struct GSMarketSnapshot
    double slow_ema;
    double rsi;
    double atr;
+   double adx;
    double previous_fast_ema;
    double previous_slow_ema;
    double trend_close;

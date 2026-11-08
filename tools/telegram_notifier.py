@@ -65,6 +65,9 @@ REASON_DESCRIPTIONS = {
     "RECONCILIATION_REQUIRED": "Permintaan diproses broker",
     "CANDIDATE_BASELINE_EMA_RSI": "Validasi indikator EMA & RSI",
     "HOLD_DAILY_ENTRY_LIMIT": "Batas kuota harian tercapai (mencegah overtrade)",
+    "HOLD_HTF_TREND_BEARISH": "Tren H1 sedang turun (bearish), sinyal beli M15 dibatalkan",
+    "HOLD_HTF_TREND_BULLISH": "Tren H1 sedang naik (bullish), sinyal jual M15 dibatalkan",
+    "HOLD_ADX_SIDEWAYS": "Pasar sedang sideways/flat (kekuatan tren lemah, ADX < batas aman)",
     "DISCONNECTED_SERVER_STOPS_ONLY": "Koneksi terputus (Stop Loss server aktif)",
     "EQUITY_REFERENCE_FLOOR": "Batas pengaman modal minimum",
 }
@@ -83,6 +86,7 @@ KEY_TRANSLATIONS = {
     "budget": "Alokasi Modal",
     "risk_est": "Estimasi Risiko",
     "margin_est": "Estimasi Margin",
+    "adx": "Kekuatan Tren (ADX)",
 }
 
 
@@ -136,7 +140,7 @@ def audit_message(row):
         reason_text = reason
 
     formatted_vals = []
-    for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|profit|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
+    for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|profit|adx|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
         lbl = KEY_TRANSLATIONS.get(key, key)
         if key == "retcode" and value == "10009":
             formatted_vals.append(f"• {lbl}: 10009 (Sukses)")
