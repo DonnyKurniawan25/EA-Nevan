@@ -39,12 +39,19 @@ private:
         }
       return true;
      }
-   bool BrokerSessionOpen(const string symbol)
+   bool BrokerSessionOpen(const string symbol,string &reason)
      {
       MqlDateTime now;
       TimeToStruct(TimeTradeServer(),now);
       int seconds=now.hour*3600+now.min*60+now.sec;
-      if(now.hour<SessionStartHourServer || now.hour>=SessionEndHourServer) return false;
+      if(UseSessionFilter && (now.hour<SessionStartHourServer || now.hour>=SessionEndHourServer))
+         return GSReject(reason,"HOLD_SESSION_FILTER_CLOSED");
+      if(BlockMidnightRollover)
+        {
+         if((now.hour==23 && now.min>=RolloverStartMinute) ||
+            (now.hour==0 && now.min<RolloverEndMinute))
+            return GSReject(reason,"HOLD_MIDNIGHT_ROLLOVER");
+        }
       for(uint index=0;index<32;index++)
         {
          datetime from=0,to=0;
@@ -54,7 +61,7 @@ private:
          if(start<finish && seconds>=start && seconds<finish) return true;
          if(start>finish && (seconds>=start || seconds<finish)) return true;
         }
-      return false;
+      return GSReject(reason,"HOLD_MARKET_SESSION_CLOSED");
      }
 public:
    bool CanManage(string &reason)
@@ -85,7 +92,9 @@ public:
       if(!spec.FreshTick(tick,StaleTickSeconds,reason)) return false;
       if((tick.ask-tick.bid)/spec.point>MaxAllowedSpreadPoints)
          return GSReject(reason,"HOLD_SPREAD_LIMIT");
-      if(!BrokerSessionOpen(spec.symbol)) return GSReject(reason,"HOLD_MARKET_SESSION_CLOSED");
+      if(UseSpreadATRFilter && GSPositive(data.atr) && (tick.ask-tick.bid)>data.atr*MaxSpreadATRMultiple)
+         return GSReject(reason,"HOLD_SPREAD_ATR_EXCESSIVE");
+      if(!BrokerSessionOpen(spec.symbol,reason)) return false;
       long mode=SymbolInfoInteger(spec.symbol,SYMBOL_TRADE_MODE);
       if(mode==SYMBOL_TRADE_MODE_DISABLED || mode==SYMBOL_TRADE_MODE_CLOSEONLY ||
          (side==GS_BUY && mode==SYMBOL_TRADE_MODE_SHORTONLY) ||

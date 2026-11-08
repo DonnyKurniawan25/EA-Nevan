@@ -366,6 +366,8 @@ void GSProcess(const bool evaluate_signal)
          GSSide side=GSEvaluateRules(data,tick,reason);
          if((tick.ask-tick.bid)/g_symbol.point>MaxAllowedSpreadPoints)
            { side=GS_HOLD; reason="HOLD_SPREAD_LIMIT"; }
+         if(UseSpreadATRFilter && GSPositive(data.atr) && (tick.ask-tick.bid)>data.atr*MaxSpreadATRMultiple)
+           { side=GS_HOLD; reason="HOLD_SPREAD_ATR_EXCESSIVE"; }
          g_signal=EnumToString(side)+" "+reason;
          g_log.Event("SIGNAL",reason,StringFormat("%s model=%s close=%.5f fast=%.5f slow=%.5f rsi=%.2f atr=%.5f adx=%.2f htf_close=%.5f htf_fast=%.5f htf_slow=%.5f htf_available=%I64d",
                      EnumToString(side),EnumToString(SignalModel),data.bar.close,data.fast_ema,data.slow_ema,

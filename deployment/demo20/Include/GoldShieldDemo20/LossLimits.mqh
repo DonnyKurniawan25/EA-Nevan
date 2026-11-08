@@ -101,7 +101,13 @@ bool GSReadLossBudget(const double reference,const double equity,GSLossBudget &b
       if(closed[i].net>=-1e-8) break;
       budget.loss_streak++;
      }
-   if(budget.entries_today>=MaxEntriesPerDay) return GSReject(reason,"HOLD_DAILY_ENTRY_LIMIT");
+   int effective_max_entries=MaxEntriesPerDay;
+   if(UseDynamicDailyQuota)
+     {
+      if(budget.daily_net>=-1e-8)
+         effective_max_entries=MaxDynamicEntriesPerDay;
+     }
+   if(budget.entries_today>=effective_max_entries) return GSReject(reason,"HOLD_DAILY_ENTRY_LIMIT");
    if(budget.loss_streak>=MaxConsecutiveLossesPerDay) return GSReject(reason,"HOLD_DAILY_LOSS_STREAK");
    if(budget.daily_net<=-reference*MaxDailyLossPct/100.0) return GSReject(reason,"HOLD_DAILY_LOSS_LIMIT");
    if(budget.weekly_net<=-reference*MaxWeeklyLossPct/100.0) return GSReject(reason,"HOLD_WEEKLY_LOSS_LIMIT");

@@ -59,10 +59,18 @@ input int MaxDeviationPoints=20;
 input int CooldownMinutes=30;
 input int SessionStartHourServer=0;
 input int SessionEndHourServer=24;
+input bool UseSessionFilter=false; // Filter jendela jam sesi trading aktif
+input bool BlockMidnightRollover=true; // Blokir entri saat rollover broker
+input int RolloverStartMinute=55; // Menit mulai blokir rollover (23:55)
+input int RolloverEndMinute=15; // Menit selesai blokir rollover (00:15)
+input bool UseSpreadATRFilter=true; // Filter pelebaran spread dinamis terhadap ATR
+input double MaxSpreadATRMultiple=0.30; // Toleransi spread maksimal (% dari ATR M15, 0.30 = 30%)
 input double MaxDailyLossPct=0.5; // Account realized trading P/L, measured against persisted reference.
 input double MaxWeeklyLossPct=1.0;
 input int MaxConsecutiveLossesPerDay=2; // Owned, fully closed positions after all costs.
 input int MaxEntriesPerDay=3; // Unique owned positions; partial fills count once.
+input bool UseDynamicDailyQuota=true; // Kuota dinamis: terus jika untung/impas, batasi ketat jika rugi
+input int MaxDynamicEntriesPerDay=10; // Batas absolut entri per hari saat mode kuota dinamis
 
 input group "FEATURE GATES - belum tersedia pada Phase 1"
 input bool GridEnabled=false;
@@ -120,7 +128,11 @@ bool GSValidateSettings(string &reason)
       MaxAllowedSpreadPoints<1 || StaleTickSeconds<1 || MaxDeviationPoints<0 ||
       CooldownMinutes<1 || SessionStartHourServer<0 || SessionStartHourServer>23 ||
       SessionEndHourServer<1 || SessionEndHourServer>24 ||
-      SessionStartHourServer>=SessionEndHourServer)
+      SessionStartHourServer>=SessionEndHourServer ||
+      !GSPositive(MaxSpreadATRMultiple) || MaxSpreadATRMultiple>2.0 ||
+      RolloverStartMinute<0 || RolloverStartMinute>59 ||
+      RolloverEndMinute<0 || RolloverEndMinute>59 ||
+      MaxDynamicEntriesPerDay<1 || MaxDynamicEntriesPerDay>50)
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
   }
