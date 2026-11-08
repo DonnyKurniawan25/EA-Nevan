@@ -50,6 +50,13 @@ input bool UseCandleDirectionFilter=true; // Sinyal wajib searah candle M15 (BUY
 input double MinCandleClosePercent=50.0; // Tutup candle minimal di 50% range atas (BUY) atau bawah (SELL)
 input bool UseTickVolumeFilter=true; // Filter volume candle terhadap rata-rata 5 candle
 input double MinTickVolumeRatio=0.75; // Rasio volume minimal dibanding rata-rata 5 candle (0.75 = 75%)
+input bool UseFridayCloseGuard=true; // Tutup posisi otomatis sebelum bursa Jumat tutup (hindari weekend gap)
+input int FridayCloseHourServer=23; // Jam server untuk auto-close Jumat
+input int FridayCloseMinuteServer=45; // Menit server untuk auto-close Jumat
+input bool RequireSameDirectionMulti=true; // Posisi tambahan (multi-posisi) wajib searah, tolak hedging
+input bool UseMinATRFilter=true; // Tolak entri jika ATR terlalu kecil (pasar mati / likuiditas nol)
+input double MinATRPoints=20.0; // Batas minimal ATR dalam points
+input double EMAPenetrationBufferATR=0.10; // Buffer penetrasi harga terhadap EMA (0.10 = 10% ATR)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
@@ -152,7 +159,10 @@ bool GSValidateSettings(string &reason)
       !GSPositive(PartialCloseTriggerATR) ||
       PartialClosePct<=0.0 || PartialClosePct>=100.0 ||
       MinCandleClosePercent<10.0 || MinCandleClosePercent>90.0 ||
-      MinTickVolumeRatio<0.1 || MinTickVolumeRatio>3.0)
+      MinTickVolumeRatio<0.1 || MinTickVolumeRatio>3.0 ||
+      FridayCloseHourServer<0 || FridayCloseHourServer>23 ||
+      FridayCloseMinuteServer<0 || FridayCloseMinuteServer>59 ||
+      MinATRPoints<0.0 || EMAPenetrationBufferATR<0.0 || EMAPenetrationBufferATR>1.0)
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
   }

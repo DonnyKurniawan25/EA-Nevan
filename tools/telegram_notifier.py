@@ -22,6 +22,7 @@ LABELS = {
     "TIME_PROFIT_EXIT": "Target waktu tercapai: Posisi ditutup saat untung",
     "EARLY_REVERSAL_EXIT": "Pembalikan arah tren terdeteksi: Cut loss dini",
     "STOP_MODIFY": "Proteksi modal: Stop Loss digeser ke Break-Even (Rp0 risiko)",
+    "FRIDAY_PRE_CLOSE": "Proteksi akhir pekan: Posisi ditutup otomatis jelang libur bursa (Anti-Gap)",
 }
 ALERT_STATES = {"PAUSED_RISK", "ERROR_BLOCKED", "SAFE_MODE", "PAUSED_MANUAL", "PAUSED_VOLATILITY"}
 REASONS = set("""BASELINE_RULES RECONCILIATION_REQUIRED BROKER_PREFLIGHT_REJECTED BROKER_POSITION_PRESENT
@@ -51,6 +52,7 @@ EVENT_ICONS = {
     "EARLY_REVERSAL_EXIT": "⚠️",
     "PARTIAL_CLOSE": "🎯",
     "STOP_MODIFY": "🛡️",
+    "FRIDAY_PRE_CLOSE": "🛡️",
     "STATE": "ℹ️",
 }
 
@@ -81,6 +83,11 @@ REASON_DESCRIPTIONS = {
     "HOLD_CANDLE_UPPER_WICK_REJECTION": "Sumbu Atas Panjang / Rejection (Batal BUY)",
     "HOLD_CANDLE_LOWER_WICK_REJECTION": "Sumbu Bawah Panjang / Rejection (Batal SELL)",
     "HOLD_LOW_TICK_VOLUME": "Volume Pasar Rendah / Sepi (Batal Masuk)",
+    "HOLD_FRIDAY_WEEKEND_APPROACHING": "Bursa libur akhir pekan segera tiba (menolak order baru)",
+    "HOLD_OPPOSITE_DIRECTION_EXISTS": "Ada posisi aktif berlawanan arah (menolak hedging)",
+    "HOLD_ATR_TOO_LOW_DEAD_MARKET": "Volatilitas ATR terlalu rendah / pasar mati",
+    "HOLD_EMA_PENETRATION_INSUFFICIENT": "Penembusan EMA terlalu tipis / rawan whipsaw",
+    "WEEKEND_GAP_PREVENTION": "Penutupan otomatis sebelum bursa emas/forex tutup",
     "DISCONNECTED_SERVER_STOPS_ONLY": "Koneksi terputus (Stop Loss server aktif)",
     "EQUITY_REFERENCE_FLOOR": "Batas pengaman modal minimum",
 }

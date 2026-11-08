@@ -22,7 +22,25 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_ADX_SIDEWAYS"; return GS_HOLD; }
      }
 
+   // Filter likuiditas pasar mati via Min ATR
+   if(UseMinATRFilter && GSPositive(MinATRPoints))
+     {
+      double min_atr=MinATRPoints*_Point;
+      if(data.atr<min_atr)
+        { reason="HOLD_ATR_TOO_LOW_DEAD_MARKET"; return GS_HOLD; }
+     }
+
    int side=GSBaselineSide(data.bar.close,data.fast_ema,data.slow_ema,data.rsi,UseRSIFilter);
+
+   // Filter anti-whipsaw: penembusan EMA wajib punya buffer memadai
+   if(side!=0 && EMAPenetrationBufferATR>0.0 && GSPositive(data.atr))
+     {
+      double pen_buf=data.atr*EMAPenetrationBufferATR;
+      if(side==1 && data.bar.close<data.fast_ema+pen_buf)
+        { reason="HOLD_EMA_PENETRATION_INSUFFICIENT"; return GS_HOLD; }
+      else if(side==-1 && data.bar.close>data.fast_ema-pen_buf)
+        { reason="HOLD_EMA_PENETRATION_INSUFFICIENT"; return GS_HOLD; }
+     }
 
    if(side!=0 && RequireFreshCross)
      {

@@ -111,6 +111,35 @@ void GSProcess(const bool evaluate_signal)
      }
    g_had_position=(g_owned.count>0);
 
+   // Rule 0: Friday Pre-Close Exit (Hindari weekend gap risk pada instrumen non-crypto)
+   if(UseFridayCloseGuard && g_owned.count>0)
+     {
+      MqlDateTime broker_time;
+      if(TimeToStruct(TimeTradeServer(),broker_time))
+        {
+         bool is_crypto=(StringFind(TradeSymbol,"BTC")>=0 || StringFind(TradeSymbol,"ETH")>=0 || StringFind(TradeSymbol,"SOL")>=0);
+         if(!is_crypto && broker_time.day_of_week==5)
+           {
+            if(broker_time.hour>FridayCloseHourServer || (broker_time.hour==FridayCloseHourServer && broker_time.min>=FridayCloseMinuteServer))
+              {
+               for(int i=PositionsTotal()-1;i>=0;i--)
+                 {
+                  ulong t=PositionGetTicket(i);
+                  if(t==0 || !PositionSelectByTicket(t)) continue;
+                  if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+                    {
+                     string c_reason="";
+                     if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"FRIDAY_PRE_CLOSE_EXIT"))
+                       {
+                        g_log.Event("FRIDAY_PRE_CLOSE","WEEKEND_GAP_PREVENTION",StringFormat("ticket=%I64u",t));
+                       }
+                    }
+                 }
+              }
+           }
+        }
+     }
+
    // Rule 1: Time-based profit exit (MaxHoldMinutes)
    if(MaxHoldMinutes>0 && g_owned.count>0)
      {
@@ -206,6 +235,7 @@ void GSProcess(const bool evaluate_signal)
                        }
                     }
                  }
+               double min_dist=(double)MathMax(g_symbol.stops_level,g_symbol.freeze_level)*point+g_symbol.tick_size;
                if(p_type==POSITION_TYPE_BUY)
                  {
                   // 1. Break-Even Check
@@ -215,9 +245,12 @@ void GSProcess(const bool evaluate_signal)
                      if(be_trig)
                        {
                         double new_sl=NormalizeDouble(open_price+point,digits);
-                        string mod_reason="";
-                        g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason,"BREAK_EVEN");
-                        current_sl=new_sl;
+                        if(p_tick.bid-new_sl>=min_dist)
+                          {
+                           string mod_reason="";
+                           g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason,"BREAK_EVEN");
+                           current_sl=new_sl;
+                          }
                        }
                     }
                   // 2. Trailing Stop Check (aktif setelah SL terkunci di atas modal)
@@ -226,6 +259,8 @@ void GSProcess(const bool evaluate_signal)
                      double trail_dist=TrailingStopATR*live_atr;
                      double trail_step=TrailingStepATR*live_atr;
                      double target_sl=NormalizeDouble(p_tick.bid-trail_dist,digits);
+                     if(target_sl>p_tick.bid-min_dist)
+                        target_sl=NormalizeDouble(p_tick.bid-min_dist,digits);
                      if(target_sl>=current_sl+trail_step && target_sl>open_price)
                        {
                         string mod_reason="";
@@ -242,9 +277,12 @@ void GSProcess(const bool evaluate_signal)
                      if(be_trig)
                        {
                         double new_sl=NormalizeDouble(open_price-point,digits);
-                        string mod_reason="";
-                        g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason,"BREAK_EVEN");
-                        current_sl=new_sl;
+                        if(new_sl-p_tick.ask>=min_dist)
+                          {
+                           string mod_reason="";
+                           g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason,"BREAK_EVEN");
+                           current_sl=new_sl;
+                          }
                        }
                     }
                   // 2. Trailing Stop Check (aktif setelah SL terkunci di bawah modal)
@@ -253,6 +291,8 @@ void GSProcess(const bool evaluate_signal)
                      double trail_dist=TrailingStopATR*live_atr;
                      double trail_step=TrailingStepATR*live_atr;
                      double target_sl=NormalizeDouble(p_tick.ask+trail_dist,digits);
+                     if(target_sl<p_tick.ask+min_dist)
+                        target_sl=NormalizeDouble(p_tick.ask+min_dist,digits);
                      if(target_sl<=current_sl-trail_step && target_sl<open_price)
                        {
                         string mod_reason="";
@@ -411,6 +451,15 @@ void GSProcess(const bool evaluate_signal)
          GSAssessCapital(g_symbol,g_storage);
          g_state.Set(SIGNAL_PENDING,"CLOSED_CANDLE_RECEIVED",g_log);
          GSSide side=GSEvaluateRules(data,tick,reason);
+         if(side!=GS_HOLD && g_owned.count>0 && RequireSameDirectionMulti)
+           {
+            if((g_owned.direction==POSITION_TYPE_BUY && side==GS_SELL) ||
+               (g_owned.direction==POSITION_TYPE_SELL && side==GS_BUY))
+              {
+               side=GS_HOLD;
+               reason="HOLD_OPPOSITE_DIRECTION_EXISTS";
+              }
+           }
          if((tick.ask-tick.bid)/g_symbol.point>MaxAllowedSpreadPoints)
            { side=GS_HOLD; reason="HOLD_SPREAD_LIMIT"; }
          if(UseSpreadATRFilter && GSPositive(data.atr) && (tick.ask-tick.bid)>data.atr*MaxSpreadATRMultiple)
