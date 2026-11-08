@@ -25,7 +25,7 @@ input int RSIPeriod=14;
 input bool UseRSIFilter=true;
 input bool UseADXFilter=true; // Sideways chop filter via ADX
 input int ADXPeriod=14; // ADX period
-input double ADXThreshold=22.0; // Minimum ADX level to permit entry (below=sideways)
+input double ADXThreshold=20.0; // Minimum ADX level to permit entry (below=sideways)
 input int ATRPeriod=14;
 input int MinClosedBars=250;
 input double StopATRMultiple=2.0;
