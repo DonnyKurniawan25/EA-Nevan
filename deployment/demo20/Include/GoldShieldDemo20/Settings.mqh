@@ -49,6 +49,8 @@ input bool RequireFreshCross=false; // Hanya masuk saat bar baru saja crossover 
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
+input bool   UseAutoLotByRisk=false; // Hitung lot dinamis berbasis toleransi risiko modal (MaxRiskPerTradePct & jarak SL)
+input double MaxLotPerTrade=0.02;    // Batas lot maksimum per posisi saat UseAutoLotByRisk aktif
 input double MaxRiskPerTradePct=0.5;
 input double MaxAggregateOpenRiskPct=1.0;
 input double MaxTotalAccountLots=0.10; // Raw lots summed across account; not equivalent notionals.
@@ -129,6 +131,8 @@ bool GSValidateSettings(string &reason)
       MinFreeMarginPct>100.0 || !MathIsValidNumber(RiskBufferPct) || RiskBufferPct<0.0 ||
       !MathIsValidNumber(CostBufferPerLot) || CostBufferPerLot<0.0)
       return GSReject(reason,"INVALID_RISK_SETTINGS");
+   if(UseAutoLotByRisk && (!GSPositive(MaxLotPerTrade) || MaxLotPerTrade>MaxTotalAccountLots))
+      return GSReject(reason,"INVALID_AUTO_LOT_SETTINGS");
    if(!GSPositive(EquityShieldMinPctOfReference) || EquityShieldMinPctOfReference>=100.0 ||
       !GSPositive(MaxPositionLossPct) || MaxPositionLossPct>2.0 ||
       MaxAllowedSpreadPoints<1 || StaleTickSeconds<1 || MaxDeviationPoints<0 ||

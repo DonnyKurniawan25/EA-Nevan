@@ -130,6 +130,17 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
    FileWrite(file,TimeToString(now,TIME_DATE|TIME_SECONDS),"DEMO",TradeSymbol,GS_DEMO20_LIMIT,used,entries,closed,
              wins,losses,net,AccountInfoString(ACCOUNT_CURRENCY),owned.count,trial,EnumToString(state.State()),state.Reason());
    FileFlush(file); FileClose(file);
+
+   int acc_file=FileOpen("GoldShield\\account_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
+   if(acc_file!=INVALID_HANDLE)
+     {
+      FileWrite(acc_file,"time_server","balance","equity","currency","open_positions");
+      FileWrite(acc_file,TimeToString(now,TIME_DATE|TIME_SECONDS),
+                DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE),2),
+                DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),2),
+                AccountInfoString(ACCOUNT_CURRENCY),IntegerToString(owned.count));
+      FileFlush(acc_file); FileClose(acc_file);
+     }
    if(used>=GS_DEMO20_LIMIT && closed>=GS_DEMO20_LIMIT && owned.count==0) complete=true;
   }
 #endif

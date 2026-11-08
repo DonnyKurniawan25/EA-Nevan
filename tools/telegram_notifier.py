@@ -258,6 +258,75 @@ def snapshot_message(old, new):
     return ("📊 GoldShield DEMO status | " + new["symbol"] + "\n" + "\n".join(pieces))[:1500]
 
 
+def generate_daily_recap(source_dir, target_date=None):
+    from datetime import datetime, timezone
+    source = Path(source_dir)
+    snapshots = sorted(source.glob("demo20_*.csv"))
+    snap_data = None
+    for p in snapshots:
+        val = snapshot_data(p)
+        if val and (snap_data is None or val.get("closed_positions", 0) >= snap_data.get("closed_positions", 0)):
+            snap_data = val
+    if not snap_data:
+        return None
+
+    balance = None
+    equity = None
+    acc_file = source / "account_live.csv"
+    preflight = source / "server_preflight.csv"
+    if acc_file.exists():
+        try:
+            lines = acc_file.read_text(errors="ignore").strip().splitlines()
+            if len(lines) >= 2:
+                parts = lines[1].split(",")
+                balance = float(parts[1])
+                equity = float(parts[2])
+        except Exception:
+            pass
+    if balance is None and preflight.exists():
+        try:
+            lines = preflight.read_text(errors="ignore").strip().splitlines()
+            if len(lines) >= 2:
+                hdr = lines[0].split(",")
+                vals = lines[1].split(",")
+                d = dict(zip(hdr, vals))
+                balance = float(d.get("balance", 0.0))
+                equity = float(d.get("equity", 0.0))
+        except Exception:
+            pass
+
+    date_str = target_date or datetime.now(timezone.utc).strftime("%Y.%m.%d")
+    total_closed = snap_data.get("closed_positions", 0)
+    wins = snap_data.get("wins", 0)
+    losses = snap_data.get("losses", 0)
+    breakeven = max(0, total_closed - (wins + losses))
+    win_rate = (wins / total_closed * 100.0) if total_closed > 0 else 0.0
+    net_closed = float(snap_data.get("net_closed", 0.0))
+    pnl_sign = "+" if net_closed >= 0 else ""
+    pnl_icon = "🟢" if net_closed >= 0 else "🔴"
+    curr = snap_data.get("currency", "USD")
+
+    lines = [
+        "📊 REKAPITULASI TRADING HARIAN",
+        f"📅 Tanggal: {date_str} (Server UTC)",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"• Pasang Mata Uang: {snap_data.get('symbol', 'BTCUSDm')}",
+        f"• Total Order Selesai: {total_closed} Transaksi",
+        f"• Menang (Win): {wins} Transaksi ({win_rate:.1f}%)",
+        f"• Kalah (Loss): {losses} Transaksi",
+        f"• Impas (Break-Even): {breakeven} Transaksi",
+        f"• Laba/Rugi Bersih: {pnl_sign}{net_closed:.2f} {curr} {pnl_icon}",
+        "━━━━━━━━━━━━━━━━━━━━",
+    ]
+    if balance is not None and equity is not None:
+        lines.append(f"💰 Saldo Akun: ${balance:,.2f} {curr}")
+        lines.append(f"📈 Ekuitas Akun: ${equity:,.2f} {curr}")
+    lines.append(f"🛡️ Kuota DEMO: {snap_data.get('entry_submissions', 0)}/{snap_data.get('limit', 20)} Transaksi")
+    lines.append("⚙️ Status Robot: Berjalan Normal & Terproteksi Otomatis")
+    return "\n".join(lines)[:1500]
+
+
+
 def records(data):
     """Only newline-terminated, complete CSV records, with byte offsets."""
     end = data.rfind(b"\n") + 1
@@ -297,8 +366,8 @@ class TelegramSender:
 
     @classmethod
     def from_env(cls, env, timeout=15):
-        token = env.get("TELEGRAM_BOT_TOKEN", "")
-        token_file = env.get("TELEGRAM_BOT_TOKEN_FILE", "")
+        token = env.get("TELEGRAM_BOT_TOKEN", "").strip().strip('"').strip("'")
+        token_file = env.get("TELEGRAM_BOT_TOKEN_FILE", "").strip().strip('"').strip("'")
         if token and token_file:
             raise ValueError("Set exactly one bot token source")
         if token_file:
@@ -306,8 +375,8 @@ class TelegramSender:
                 token = Path(token_file).read_text().strip()
             except OSError:
                 raise ValueError("Cannot read bot token file") from None
-        chat = env.get("TELEGRAM_CHAT_ID", "")
-        thread = env.get("TELEGRAM_THREAD_ID", "")
+        chat = env.get("TELEGRAM_CHAT_ID", "").strip().strip('"').strip("'")
+        thread = env.get("TELEGRAM_THREAD_ID", "").strip().strip('"').strip("'")
         if not re.fullmatch(r"[0-9]{5,20}:[A-Za-z0-9_-]{20,100}", token):
             raise ValueError("Invalid bot token configuration")
         if not re.fullmatch(r"-?[0-9]{1,20}", chat) or int(chat) == 0 or not re.fullmatch(r"[0-9]{1,12}", thread) or int(thread) <= 0:
@@ -440,11 +509,28 @@ class Notifier:
                 self.state["snapshots"][path.name] = value
                 self.save()
 
+        from datetime import datetime, timezone
+        today_date = datetime.now(timezone.utc).strftime("%Y.%m.%d")
+        last_recap = self.state.get("last_daily_recap")
+        if last_recap is None:
+            self.state["last_daily_recap"] = today_date
+            self.save()
+        elif last_recap != today_date:
+            recap_msg = generate_daily_recap(self.source, target_date=last_recap)
+            if recap_msg:
+                self.state["pending"] = {"message": recap_msg, "group": "system", "key": "daily_recap", "value": today_date}
+                self.save()
+                self.deliver_pending()
+            self.state["last_daily_recap"] = today_date
+            self.save()
+
     def deliver_pending(self):
-        pending = self.state.get("pending")
-        if pending:
+        pending = self.state.get("pending") if self.state else None
+        if pending and self.state:
             self.sender(pending["message"])
-            self.state[pending["group"]][pending["key"]] = pending["value"]
+            group = pending.get("group")
+            if group and group in self.state and isinstance(self.state[group], dict):
+                self.state[group][pending["key"]] = pending["value"]
             self.state["pending"] = None
             self.save()
 
@@ -460,6 +546,7 @@ def main(argv=None):
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--dry-run", action="store_true", help="No network and no cursor writes; preview only")
     parser.add_argument("--self-test", action="store_true", help="Send labelled service test only, no trade event")
+    parser.add_argument("--daily-recap", action="store_true", help="Send daily recap summary to Telegram")
     parser.add_argument("--interval", type=float, default=2.0)
     parser.add_argument("--timeout", type=float, default=15.0)
     args = parser.parse_args(argv)
@@ -476,6 +563,15 @@ def main(argv=None):
         if not args.source_dir or not Path(args.source_dir).is_dir():
             raise ValueError("Existing source directory required")
         source, state = Path(args.source_dir).resolve(), Path(args.state_dir).resolve()
+        if args.daily_recap:
+            recap_msg = generate_daily_recap(source)
+            if not recap_msg:
+                print("No snapshot data available for daily recap", file=sys.stderr)
+                return 1
+            ack = sender(recap_msg)
+            if not args.dry_run:
+                print(json.dumps(ack, sort_keys=True))
+            return 0
         if state == source or source in state.parents or state in source.parents:
             raise ValueError("Source and state directories must be disjoint")
         if not args.dry_run:

@@ -154,7 +154,9 @@ public:
          !MathIsValidNumber(reference_profit) || reference_profit>=0.0)
          return GSReject(reason,"STOP_LOSS_CALCULATION_FAILED");
       double loss_per_lot=-reference_profit/spec.volume_min;
-      double cap=MathMin(BaseLot,MaxTotalAccountLots-account_lots);
+      double max_allowed=MaxTotalAccountLots-account_lots;
+      double cap=(UseAutoLotByRisk ? (MaxLotPerTrade>0.0 ? MathMin(MaxLotPerTrade,max_allowed) : max_allowed)
+                                   : MathMin(BaseLot,max_allowed));
       plan.volume=GSRiskVolume(plan.risk_budget,loss_per_lot,RiskBufferPct,CostBufferPerLot,
                               cap,spec.volume_min,spec.volume_max,spec.volume_step);
       if(plan.volume<=0.0) return GSReject(reason,"MINIMUM_LOT_EXCEEDS_RISK_OR_VOLUME_BUDGET");

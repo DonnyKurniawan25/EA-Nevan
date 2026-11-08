@@ -349,6 +349,17 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("Harga: 75944.38", self.sent[0])
         self.assertIn("RSI: 57.52", self.sent[0])
 
+    def test_daily_recap_generation(self):
+        self.notifier()
+        self.snapshot(filled=5, closed=5, net="15.20", opened=0)
+        recap = self.module.generate_daily_recap(self.source, target_date="2026.11.08")
+        self.assertIsNotNone(recap)
+        self.assertIn("REKAPITULASI TRADING HARIAN", recap)
+        self.assertIn("Tanggal: 2026.11.08", recap)
+        self.assertIn("Total Order Selesai: 5 Transaksi", recap)
+        self.assertIn("+15.20 USD", recap)
+        self.assertIn("Status Robot: Berjalan Normal", recap)
+
 
 if __name__ == "__main__":
     unittest.main()
