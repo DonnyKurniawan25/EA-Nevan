@@ -107,18 +107,19 @@ public:
          (ulong)PositionGetInteger(POSITION_MAGIC)!=MagicNumber ||
          StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
          return GSReject(reason,"CLOSE_OWNERSHIP_REJECTED");
+      double cur_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
       GSSymbolSpec spec;
       if(!spec.Load(TradeSymbol,reason)) return false;
       ENUM_ORDER_TYPE_FILLING filling;
       if(!spec.Filling(filling,reason)) return false;
       m_trade.SetTypeFilling(filling);
       bool sent=m_trade.PositionClose(ticket,(ulong)MaxDeviationPoints);
-      log.Event("CLOSE_RESULT",exit_event,StringFormat("ticket=%I64u method=%s retcode=%u deal=%I64u",
-                ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),m_trade.ResultDeal()));
+      log.Event("CLOSE_RESULT",exit_event,StringFormat("ticket=%I64u method=%s retcode=%u deal=%I64u profit=%.2f",
+                ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),m_trade.ResultDeal(),cur_profit));
       reason="CLOSE_REQUEST_SENT_RECONCILE";
       return sent;
      }
-   bool ModifyStops(const ulong ticket,const double sl,const double tp,GSRiskFirewall &risk,GSMetrics &log,string &reason)
+   bool ModifyStops(const ulong ticket,const double sl,const double tp,GSRiskFirewall &risk,GSMetrics &log,string &reason,const string modify_reason="BREAK_EVEN")
      {
       if(!risk.CanManage(reason)) return false;
       if(!PositionSelectByTicket(ticket)) return GSReject(reason,"MODIFY_TICKET_NO_LONGER_PRESENT");
@@ -127,7 +128,7 @@ public:
          StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
          return GSReject(reason,"MODIFY_OWNERSHIP_REJECTED");
       bool sent=m_trade.PositionModify(ticket,sl,tp);
-      log.Event("STOP_MODIFY","BREAK_EVEN",StringFormat("ticket=%I64u sent=%s retcode=%u sl=%.5f tp=%.5f",
+      log.Event("STOP_MODIFY",modify_reason,StringFormat("ticket=%I64u sent=%s retcode=%u sl=%.5f tp=%.5f",
                 ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),sl,tp));
       return sent;
      }

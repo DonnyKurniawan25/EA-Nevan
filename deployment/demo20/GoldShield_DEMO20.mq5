@@ -84,7 +84,30 @@ void GSProcess(const bool evaluate_signal)
    if(g_had_position && g_owned.count==0)
      {
       if(!g_storage.SetCooldown(TimeTradeServer()+CooldownMinutes*60)) g_storage.Block();
-      g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY","Realized net P/L not calculated in Phase 1");
+      double last_deal_profit=0.0;
+      ulong last_pos_id=0;
+      bool found_deal=false;
+      if(HistorySelect(TimeTradeServer()-86400,TimeTradeServer()+60))
+        {
+         for(int d=HistoryDealsTotal()-1;d>=0;d--)
+           {
+            ulong dt=HistoryDealGetTicket(d);
+            if(dt>0 && HistoryDealGetString(dt,DEAL_SYMBOL)==TradeSymbol && (ulong)HistoryDealGetInteger(dt,DEAL_MAGIC)==MagicNumber)
+              {
+               if((ENUM_DEAL_ENTRY)HistoryDealGetInteger(dt,DEAL_ENTRY)==DEAL_ENTRY_OUT)
+                 {
+                  last_deal_profit=HistoryDealGetDouble(dt,DEAL_PROFIT)+HistoryDealGetDouble(dt,DEAL_SWAP);
+                  last_pos_id=(ulong)HistoryDealGetInteger(dt,DEAL_POSITION_ID);
+                  found_deal=true;
+                  break;
+                 }
+              }
+           }
+        }
+      if(found_deal)
+         g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY",StringFormat("ticket=%I64u profit=%.2f",last_pos_id,last_deal_profit));
+      else
+         g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY","Realized net P/L not calculated in Phase 1");
      }
    g_had_position=(g_owned.count>0);
 
@@ -113,9 +136,14 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
-   // Rule 2: Break-Even Protection (Kunci Modal)
-   if(UseBreakEvenProtection && g_owned.count>0)
+   // Rule 2: Break-Even Protection (Kunci Modal) & Dynamic ATR Trailing Stop
+   if((UseBreakEvenProtection || UseTrailingStop) && g_owned.count>0)
      {
+      GSMarketSnapshot data;
+      string m_reason="";
+      double live_atr=0.0;
+      if(g_market.Read(MinClosedBars,data,m_reason))
+         live_atr=data.atr;
       for(int i=PositionsTotal()-1;i>=0;i--)
         {
          ulong t=PositionGetTicket(i);
@@ -132,22 +160,59 @@ void GSProcess(const bool evaluate_signal)
               {
                double point=SymbolInfoDouble(TradeSymbol,SYMBOL_POINT);
                double spread=SymbolInfoInteger(TradeSymbol,SYMBOL_SPREAD)*point;
+               int digits=(int)SymbolInfoInteger(TradeSymbol,SYMBOL_DIGITS);
                if(p_type==POSITION_TYPE_BUY)
                  {
-                  if(p_tick.bid>=open_price+spread*2.0 && current_profit>0.50 && current_sl<open_price)
+                  // 1. Break-Even Check
+                  if(UseBreakEvenProtection && current_sl<open_price)
                     {
-                     double new_sl=open_price+point;
-                     string mod_reason="";
-                     g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason);
+                     bool be_trig=(live_atr>0.0) ? (p_tick.bid>=open_price+BreakEvenTriggerATR*live_atr) : (p_tick.bid>=open_price+spread*2.0 && current_profit>0.50);
+                     if(be_trig)
+                       {
+                        double new_sl=NormalizeDouble(open_price+point,digits);
+                        string mod_reason="";
+                        g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason,"BREAK_EVEN");
+                        current_sl=new_sl;
+                       }
+                    }
+                  // 2. Trailing Stop Check (aktif setelah SL terkunci di atas modal)
+                  if(UseTrailingStop && current_sl>=open_price && live_atr>0.0)
+                    {
+                     double trail_dist=TrailingStopATR*live_atr;
+                     double trail_step=TrailingStepATR*live_atr;
+                     double target_sl=NormalizeDouble(p_tick.bid-trail_dist,digits);
+                     if(target_sl>=current_sl+trail_step && target_sl>open_price)
+                       {
+                        string mod_reason="";
+                        g_executor.ModifyStops(t,target_sl,current_tp,g_risk,g_log,mod_reason,"TRAILING_STOP");
+                       }
                     }
                  }
                else if(p_type==POSITION_TYPE_SELL)
                  {
-                  if(p_tick.ask<=open_price-spread*2.0 && current_profit>0.50 && (current_sl>open_price || current_sl==0.0))
+                  // 1. Break-Even Check
+                  if(UseBreakEvenProtection && (current_sl>open_price || current_sl==0.0))
                     {
-                     double new_sl=open_price-point;
-                     string mod_reason="";
-                     g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason);
+                     bool be_trig=(live_atr>0.0) ? (p_tick.ask<=open_price-BreakEvenTriggerATR*live_atr) : (p_tick.ask<=open_price-spread*2.0 && current_profit>0.50);
+                     if(be_trig)
+                       {
+                        double new_sl=NormalizeDouble(open_price-point,digits);
+                        string mod_reason="";
+                        g_executor.ModifyStops(t,new_sl,current_tp,g_risk,g_log,mod_reason,"BREAK_EVEN");
+                        current_sl=new_sl;
+                       }
+                    }
+                  // 2. Trailing Stop Check (aktif setelah SL terkunci di bawah modal)
+                  if(UseTrailingStop && current_sl<=open_price && current_sl>0.0 && live_atr>0.0)
+                    {
+                     double trail_dist=TrailingStopATR*live_atr;
+                     double trail_step=TrailingStepATR*live_atr;
+                     double target_sl=NormalizeDouble(p_tick.ask+trail_dist,digits);
+                     if(target_sl<=current_sl-trail_step && target_sl<open_price)
+                       {
+                        string mod_reason="";
+                        g_executor.ModifyStops(t,target_sl,current_tp,g_risk,g_log,mod_reason,"TRAILING_STOP");
+                       }
                     }
                  }
               }
@@ -191,11 +256,12 @@ void GSProcess(const bool evaluate_signal)
                  }
                if(should_exit_early)
                  {
+                  double cur_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
                   string c_reason="";
                   if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"EARLY_REVERSAL_EXIT"))
                     {
                      g_log.Event("EARLY_REVERSAL_EXIT","TREND_INVALIDATED_CUT_LOSS",
-                                 StringFormat("ticket=%I64u detail=%s",t,exit_detail));
+                                 StringFormat("ticket=%I64u profit=%.2f detail=%s",t,cur_profit,exit_detail));
                     }
                  }
               }

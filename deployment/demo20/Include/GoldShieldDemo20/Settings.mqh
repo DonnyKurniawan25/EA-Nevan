@@ -33,6 +33,9 @@ input int MaxHoldMinutes=30; // Auto-close profitable trade after N minutes (0=d
 input bool UseEarlyReversalExit=true; // Close position early if M15 candle confirms trend reversal
 input bool UseBreakEvenProtection=true; // Protect capital once trade enters profit
 input double BreakEvenTriggerATR=1.0; // Profit distance in ATR to activate break-even guard
+input bool UseTrailingStop=true; // Dynamic ATR trailing stop after break-even
+input double TrailingStopATR=1.0; // Trailing stop distance behind price in ATR multiples
+input double TrailingStepATR=0.3; // Minimum profit advance in ATR to move trailing stop
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
@@ -96,7 +99,8 @@ bool GSValidateSettings(string &reason)
    if(!GSPositive(BaseLot) || !GSPositive(StopATRMultiple) ||
       !GSPositive(RewardRiskMultiple) || !GSPositive(MaxCandleATRMultiple) ||
       !GSPositive(MaxGapATRMultiple) || MaxSignalAgeSeconds<1 || MaxHoldMinutes<0 ||
-      !GSPositive(BreakEvenTriggerATR))
+      !GSPositive(BreakEvenTriggerATR) ||
+      (UseTrailingStop && (!GSPositive(TrailingStopATR) || !GSPositive(TrailingStepATR))))
       return GSReject(reason,"INVALID_SIGNAL_OR_VOLUME_SETTINGS");
    if(!GSPositive(MaxRiskPerTradePct) || MaxRiskPerTradePct>0.5 ||
       !GSPositive(MaxAggregateOpenRiskPct) || MaxAggregateOpenRiskPct>1.0 ||

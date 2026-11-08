@@ -34,7 +34,7 @@ DEMO20_SLOT_VERIFY_FAILED ORDER_INTENT_AUDIT_WRITE_FAILED BROKER_PREFLIGHT_MARGI
 DURABLE_ENTRY_INTENT_FAILED CLOSE_RETRY_LIMIT_OPERATOR_REQUIRED CLOSE_RETRY_BACKOFF
 CLOSE_TICKET_NO_LONGER_PRESENT CLOSE_OWNERSHIP_REJECTED INDICATOR_HANDLE_ERROR TIMER_ERROR
 HOLD_VOLATILITY_OR_GAP AUTO_ENTRY_DISABLED HOLD_STALE_TICK HOLD_TICK_UNAVAILABLE
-TIME_EXIT_PROFIT HOLD_DURATION_TARGET_UNREACHED EARLY_REVERSAL_EXIT TREND_INVALIDATED_CUT_LOSS BREAK_EVEN""".split())
+TIME_EXIT_PROFIT HOLD_DURATION_TARGET_UNREACHED EARLY_REVERSAL_EXIT TREND_INVALIDATED_CUT_LOSS BREAK_EVEN TRAILING_STOP""".split())
 
 EVENT_ICONS = {
     "SIGNAL": "🔔",
@@ -58,6 +58,7 @@ REASON_DESCRIPTIONS = {
     "HOLD_DURATION_TARGET_UNREACHED": "Target waktu tahan selesai saat posisi untung",
     "TREND_INVALIDATED_CUT_LOSS": "Pembalikan tren terdeteksi (cut loss dini)",
     "BREAK_EVEN": "Proteksi modal: Stop Loss digeser ke harga modal",
+    "TRAILING_STOP": "Trailing Stop aktif (mengunci keuntungan bertahap)",
     "BROKER_SNAPSHOT_EMPTY": "Posisi selesai ditutup di broker",
     "BROKER_POSITION_PRESENT": "Posisi aktif di broker",
     "BASELINE_RULES": "Sesuai aturan strategi indikator",
@@ -77,6 +78,7 @@ KEY_TRANSLATIONS = {
     "entry": "Harga Masuk",
     "sl": "Batas Rugi (SL)",
     "tp": "Target Untung (TP)",
+    "profit": "Hasil Transaksi (PnL)",
     "retcode": "Status Broker",
     "budget": "Alokasi Modal",
     "risk_est": "Estimasi Risiko",
@@ -98,6 +100,8 @@ def audit_message(row):
             return None, None
         label = "Status pengaman: " + match[1]
         signature = match[1] + ":" + (item["reason_code"] if item["reason_code"] in REASONS else "OTHER")
+    elif event == "STOP_MODIFY" and item.get("reason_code") == "TRAILING_STOP":
+        label = "Kunci keuntungan: Stop Loss digeser (Trailing Stop)"
     elif event == "SIGNAL":
         match = re.match(r"^(GS_BUY|GS_SELL)\b", item["details"])
         if not match:
@@ -132,7 +136,7 @@ def audit_message(row):
         reason_text = reason
 
     formatted_vals = []
-    for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
+    for key, value in re.findall(r"(?:^|\s)(lots|entry|sl|tp|profit|budget|risk_est|margin_est|retcode|order|deal|ticket|identifier)=(-?[0-9]{1,20}(?:\.[0-9]{1,8})?)(?=\s|$)", item["details"]):
         lbl = KEY_TRANSLATIONS.get(key, key)
         if key == "retcode" and value == "10009":
             formatted_vals.append(f"• {lbl}: 10009 (Sukses)")
@@ -140,6 +144,17 @@ def audit_message(row):
             formatted_vals.append(f"• {lbl}: #{value}")
         elif key == "lots":
             formatted_vals.append(f"• {lbl}: {value} Lot")
+        elif key == "profit":
+            try:
+                val_float = float(value)
+                if val_float > 0:
+                    formatted_vals.append(f"• {lbl}: +{value} USD (Untung)")
+                elif val_float < 0:
+                    formatted_vals.append(f"• {lbl}: {value} USD (Rugi)")
+                else:
+                    formatted_vals.append(f"• {lbl}: {value} USD (Impas / $0)")
+            except ValueError:
+                formatted_vals.append(f"• {lbl}: {value} USD")
         else:
             formatted_vals.append(f"• {lbl}: {value}")
 
@@ -154,8 +169,11 @@ def audit_message(row):
         lines.append("Penjelasan: Waktu tahan 30 menit selesai, posisi ditutup saat untung.")
     elif event == "EARLY_REVERSAL_EXIT":
         lines.append("Penjelasan: Indikator mendeteksi tren berbalik arah, cut loss dini dijalankan.")
-    elif event == "STOP_MODIFY" and "BREAK_EVEN" in reason:
-        lines.append("Penjelasan: Stop Loss digeser ke harga masuk. Posisi aman, risiko kerugian modal kini $0.00.")
+    elif event == "STOP_MODIFY":
+        if "BREAK_EVEN" in reason:
+            lines.append("Penjelasan: Stop Loss digeser ke harga masuk. Posisi aman, risiko kerugian modal kini $0.00.")
+        elif "TRAILING_STOP" in reason:
+            lines.append("Penjelasan: Trailing Stop menggeser Stop Loss mengikuti arah profit untuk mengunci keuntungan bertahap.")
     elif event == "FILL_CONFIRMED":
         lines.append("Penjelasan: Order telah terisi aktif di broker dan dipantau sistem.")
     elif event == "POSITION_CLOSED":
