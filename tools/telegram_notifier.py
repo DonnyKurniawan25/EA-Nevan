@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only GoldShield CSV observer. No MT5 API, polling bot, or trade commands."""
+"""GoldShield CSV observer; Telegram send-only by default, dedicated-bot polling opt-in."""
 import csv
 import io
 import json
@@ -358,12 +358,13 @@ class DeliveryError(Exception):
 
 
 class TelegramSender:
-    def __init__(self, token, chat_id, thread_id, timeout=15):
+    def __init__(self, token, chat_id, thread_id, timeout=15, *, polling_enabled=False):
         import urllib.request
         self._token = token
         self.chat_id = chat_id
         self.thread_id = thread_id
         self.timeout = timeout
+        self.polling_enabled = polling_enabled
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *args, **kwargs):
                 return None
@@ -386,7 +387,8 @@ class TelegramSender:
             raise ValueError("Invalid bot token configuration")
         if not re.fullmatch(r"-?[0-9]{1,20}", chat) or int(chat) == 0 or not re.fullmatch(r"[0-9]{1,12}", thread) or int(thread) <= 0:
             raise ValueError("Explicit numeric Telegram chat and positive topic ID required")
-        return cls(token, chat, int(thread), timeout)
+        polling_enabled = env.get("GOLDSHIELD_TELEGRAM_POLLING_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+        return cls(token, chat, int(thread), timeout, polling_enabled=polling_enabled)
 
     def __call__(self, text):
         import urllib.request
@@ -413,7 +415,8 @@ class TelegramSender:
             raise DeliveryError("Telegram delivery unacknowledged; retained for retry") from None
 
     def get_updates(self, offset=None, timeout=0):
-        if not hasattr(self, "_token"):
+        # One poller per bot token: shared Hermes tokens must remain send-only.
+        if not self.polling_enabled or not hasattr(self, "_token"):
             return []
         import urllib.request
         url = "https://api.telegram.org/bot" + self._token + "/getUpdates"
@@ -712,8 +715,8 @@ class Notifier:
             except Exception:
                 pass
 
-        # Paket E: Telegram Interactive Commands
-        if hasattr(self.sender, "get_updates"):
+        # Interactive polling is opt-in and requires a dedicated, non-Hermes bot.
+        if getattr(self.sender, "polling_enabled", False) and hasattr(self.sender, "get_updates"):
             try:
                 offset = self.state.get("telegram_update_offset") if self.state else None
                 updates = self.sender.get_updates(offset=offset, timeout=0)

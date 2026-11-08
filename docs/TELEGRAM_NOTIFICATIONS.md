@@ -1,6 +1,6 @@
 # GoldShield: notifikasi Telegram read-only
 
-Observer Python standard-library terpisah dari MT5. Tidak mengubah EA/binary/algoritme, tidak memanggil terminal/trade API, tidak menerima perintah Telegram dan tidak menjalankan `getUpdates`. **Core `TelegramEnabled` harus tetap `false`.** Perintah manusia kelak lewat topik Hermes adalah integrasi terpisah, bukan fitur notifier ini.
+Observer Python standard-library terpisah dari MT5. Tidak mengubah EA/binary/algoritme dan tidak memanggil terminal/trade API. **Default send-only:** tidak menerima perintah Telegram dan tidak menjalankan `getUpdates`; pengiriman alert tetap aktif. **Core `TelegramEnabled` harus tetap `false`.** Perintah lewat bot Hermes ditangani Hermes, bukan notifier ini.
 
 ## Sumber yang benar
 
@@ -26,9 +26,18 @@ TELEGRAM_CHAT_ID=REPLACE_WITH_NUMERIC_CHAT_ID
 TELEGRAM_THREAD_ID=REPLACE_WITH_POSITIVE_TOPIC_ID
 GOLDSHIELD_FILES_DIR="/home/ubuntu/.mt5/drive_c/Program Files/MetaTrader 5/MQL5/Files/GoldShield"
 GOLDSHIELD_STATE_DIR=/var/lib/goldshield-notifier
+GOLDSHIELD_TELEGRAM_POLLING_ENABLED=false
 ```
 
 Alternatif token: `TELEGRAM_BOT_TOKEN_FILE=/etc/goldshield/bot-token`, file `0600`; hilangkan `TELEGRAM_BOT_TOKEN`. Tepat satu sumber token. Chat ID dan topic ID **wajib eksplisit**; tidak ada destination default, tidak ada topik general fallback. Bot harus mempunyai izin mengirim ke topik tersebut. `--dry-run` tidak memerlukan token/destination dan tidak memakai jaringan.
+
+### Polling interaktif: opt-in, bot khusus saja
+
+**Satu poller `getUpdates` per token bot.** Dua proses polling dengan token sama dapat mencuri update dan menyebabkan konflik fatal polling Hermes. Mengirim `sendMessage` saja tidak mengambil update. Jangan aktifkan polling notifier dengan token Hermes, meskipun chat/topik atau direktori state berbeda.
+
+`GOLDSHIELD_TELEGRAM_POLLING_ENABLED` default `false` bila tidak disetel. Hanya `1`, `true`, `yes`, atau `on` yang mengaktifkan polling (case-insensitive, whitespace luar diabaikan). Nilai kosong, `0`, `false`, `no`, `off`, dan nilai lain tetap menonaktifkan polling; string nonkosong tidak otomatis dianggap true.
+
+Untuk opt-in pada deployment terpisah, gunakan **bot khusus dengan token berbeda dari Hermes dan tanpa poller lain**, lalu set flag ke `true`. Perintah `/status`, `/recap`, `/pause`, `/resume`, dan `/help` hanya diterima dalam mode ini; `/pause` dan `/resume` mengubah file `MANUAL_PAUSE` di direktori sumber, sehingga memerlukan review izin/operator tersendiri. **Pada host yang berbagi token dengan Hermes, biarkan flag tidak disetel atau `false`; jangan aktifkan.** Mode default tetap mengirim alert/rekap dan mempertahankan cursor, pending delivery, serta offset Telegram lama tanpa mengonsumsi update. `--dry-run` tetap tanpa jaringan, termasuk jika flag diaktifkan.
 
 ```sh
 # Preview pesan servis, tidak ada jaringan atau fake trade:
@@ -71,4 +80,4 @@ Service berjalan sebagai `ubuntu`, menggunakan `/usr/bin/python3 /home/ubuntu/EA
 /home/ubuntu/goldshield-linux/test-venv/bin/python -m unittest discover -s tests -p test_telegram_notifier.py -v
 ```
 
-Fixture mengikuti schema MQL sebenarnya; sender/HTTP di-inject secara lokal, tanpa Telegram/MT5/broker nyata. Review hasil sebelum deploy dan lakukan service self-test berlabel hanya setelah destination nyata dikonfirmasi operator.
+Fixture mengikuti schema MQL sebenarnya; sender/HTTP di-inject secara lokal, tanpa Telegram/MT5/broker nyata. Regresi memakai `TelegramSender` produksi untuk membuktikan default tidak membuat request pada scan tenang atau `get_updates` langsung, serta memeriksa allowlist opt-in dan offset. Review hasil sebelum deploy dan lakukan service self-test berlabel hanya setelah destination nyata dikonfirmasi operator.

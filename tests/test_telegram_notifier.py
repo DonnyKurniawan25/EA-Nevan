@@ -165,6 +165,80 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("Net tertutup kumulatif", self.sent[-1])
         self.assertIn("BUKAN profit satu transaksi", self.sent[-1])
 
+    def test_default_telegram_sender_never_receives_updates(self):
+        from unittest.mock import Mock
+        n = self.notifier()
+        env = {"TELEGRAM_BOT_TOKEN": "123456789:" + "A" * 35,
+               "TELEGRAM_CHAT_ID": "-1001234567890", "TELEGRAM_THREAD_ID": "42"}
+        senders = [self.module.TelegramSender.from_env(env),
+                   self.module.TelegramSender(env["TELEGRAM_BOT_TOKEN"], env["TELEGRAM_CHAT_ID"], 42)]
+        for sender in senders:
+            with self.subTest(sender=sender):
+                sender.open_request = Mock(side_effect=lambda *args, **kwargs: io.BytesIO(b'{"ok":true,"result":[]}'))
+                n.sender = sender
+                n.poll()  # Baseline, then real observer cycles with valid DEMO evidence.
+                n.state["telegram_update_offset"] = 51
+                n.save()
+                n.poll()
+                before = (self.state / "cursor.json").read_bytes()
+                n.poll()
+                self.assertEqual(sender.get_updates(offset=51), [])
+                sender.open_request.assert_not_called()
+                self.assertEqual((self.state / "cursor.json").read_bytes(), before)
+                self.assertEqual(n.state["telegram_update_offset"], 51)
+
+                # Send-only must still deliver observer alerts and durable checkpoints.
+                sender.open_request.side_effect = lambda *args, **kwargs: io.BytesIO(
+                    b'{"ok":true,"result":{"message_id":123,"chat":{"id":-1001234567890},"message_thread_id":42}}')
+                self.append(audit())
+                n.poll()
+                sender.open_request.assert_called_once()
+                request = sender.open_request.call_args.args[0]
+                self.assertEqual(request.full_url.rsplit("/", 1)[-1], "sendMessage")
+                self.assertIn("Permintaan entry", json.loads(request.data)["text"])
+                self.assertIsNone(n.state["pending"])
+                self.assertEqual(n.state["audit"][n.identity(self.file)]["offset"], self.file.stat().st_size)
+                self.assertEqual(json.loads((self.state / "cursor.json").read_text()), n.state)
+                self.assertEqual(n.state["telegram_update_offset"], 51)
+                sender.open_request.reset_mock()
+                n.poll()
+                sender.open_request.assert_not_called()
+
+    def test_polling_requires_documented_truthy_environment_value(self):
+        n = self.notifier()
+        n.poll()
+        env = {"TELEGRAM_BOT_TOKEN": "123456789:" + "A" * 35,
+               "TELEGRAM_CHAT_ID": "-1001234567890", "TELEGRAM_THREAD_ID": "42"}
+        values = {"1": True, "true": True, "yes": True, "on": True,
+                  " TRUE ": True, "Yes": True, "ON": True,
+                  "": False, "0": False, "false": False, "no": False, "off": False,
+                  " FALSE ": False, "2": False, "enabled": False, "true-ish": False}
+        update = {"update_id": 51, "message": {"chat": {"id": -1001234567890}, "text": "/help"}}
+        for value, enabled in values.items():
+            with self.subTest(value=value):
+                sender = self.module.TelegramSender.from_env({**env, "GOLDSHIELD_TELEGRAM_POLLING_ENABLED": value})
+                calls = []
+                def open_request(request, timeout):
+                    method = request.full_url.rsplit("/", 1)[-1]
+                    calls.append((method, json.loads(request.data)))
+                    result = [update] if method == "getUpdates" else {
+                        "message_id": 123, "chat": {"id": -1001234567890}, "message_thread_id": 42}
+                    return io.BytesIO(json.dumps({"ok": True, "result": result}).encode())
+                sender.open_request = open_request
+                n.sender = sender
+                n.state["telegram_update_offset"] = 51
+                n.save()
+                n.poll()
+                updates = sender.get_updates(offset=52, timeout=1)
+                self.assertEqual([method for method, _ in calls],
+                                 ["getUpdates", "sendMessage", "getUpdates"] if enabled else [])
+                self.assertEqual(updates, [update] if enabled else [])
+                self.assertEqual(n.state["telegram_update_offset"], 52 if enabled else 51)
+                if enabled:
+                    self.assertEqual(calls[0][1], {"offset": 51, "timeout": 0, "limit": 10})
+                    self.assertEqual(calls[2][1], {"offset": 52, "timeout": 1, "limit": 10})
+                    self.assertIn("PANDUAN PERINTAH BOT GOLDSHIELD", calls[1][1]["text"])
+
     def test_transport_rejects_missing_or_wrong_ack_destination(self):
         self.notifier()
         module = self.module
