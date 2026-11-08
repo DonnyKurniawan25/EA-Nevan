@@ -8,10 +8,11 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
    if(TimeCurrent()<data.available_at_server ||
       TimeCurrent()-data.available_at_server>MaxSignalAgeSeconds)
      { reason="HOLD_SIGNAL_TOO_OLD_OR_CLOCK"; return GS_HOLD; }
-   if(data.bar.high-data.bar.low>data.atr*MaxCandleATRMultiple ||
-      MathAbs(data.bar.open-data.previous.close)>data.atr*MaxGapATRMultiple ||
+   if(data.bar.high-data.bar.low>data.atr*MaxNewsCandleATRMultiple)
+     { reason="HOLD_NEWS_VOLATILITY_SURGE"; return GS_HOLD; }
+   if(MathAbs(data.bar.open-data.previous.close)>data.atr*MaxGapATRMultiple ||
       MathAbs(tick.bid-data.bar.close)>data.atr*MaxGapATRMultiple)
-     { reason="HOLD_VOLATILITY_OR_GAP"; return GS_HOLD; }
+     { reason="HOLD_GAP_OR_SLIPPAGE"; return GS_HOLD; }
 
    // Prioritas 2: Filter sideways / konsolidasi via ADX
    if(UseADXFilter)

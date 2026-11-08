@@ -247,11 +247,12 @@ void GSProcess(const bool evaluate_signal)
                double min_dist=(double)MathMax(g_symbol.stops_level,g_symbol.freeze_level)*point+g_symbol.tick_size;
                string partial_key=StringFormat("tp1_closed_%I64u",t);
                bool has_partial=(g_storage.Get(partial_key)>0.5);
+               bool spread_frozen=(SpreadFreezeOnTrailing && live_atr>0.0 && (p_tick.ask-p_tick.bid)>MaxSpreadATRMultiple*live_atr);
 
                if(p_type==POSITION_TYPE_BUY)
                  {
                   // 1. Break-Even Check
-                  if(UseBreakEvenProtection && current_sl<open_price)
+                  if(!spread_frozen && UseBreakEvenProtection && current_sl<open_price)
                     {
                      bool be_trig=(live_atr>0.0) ? (p_tick.bid>=open_price+BreakEvenTriggerATR*live_atr) : (p_tick.bid>=open_price+spread*2.0 && current_profit>0.50);
                      if(be_trig)
@@ -267,7 +268,7 @@ void GSProcess(const bool evaluate_signal)
                        }
                     }
                   // 2. Stepped Profit Lock (1.5 ATR -> +0.5, 2.0 ATR -> +1.0, 3.0 ATR -> +2.0)
-                  if(UseSteppedProfitLock && live_atr>0.0)
+                  if(!spread_frozen && UseSteppedProfitLock && live_atr>0.0)
                     {
                      double gain=p_tick.bid-open_price;
                      double gain_atr=gain/live_atr;
@@ -287,7 +288,7 @@ void GSProcess(const bool evaluate_signal)
                        }
                     }
                   // 3. Trailing Stop Check (aktif setelah SL terkunci di atas modal)
-                  if(UseTrailingStop && current_sl>=open_price && live_atr>0.0)
+                  if(!spread_frozen && UseTrailingStop && current_sl>=open_price && live_atr>0.0)
                     {
                      double trail_dist=(has_partial && UseAggressiveRunnerTrailing) ? (PartialTrailingATR*live_atr) : (TrailingStopATR*live_atr);
                      if(UseAdaptiveADXTrailing && live_adx>0.0 && live_adx<25.0)
@@ -306,7 +307,7 @@ void GSProcess(const bool evaluate_signal)
                else if(p_type==POSITION_TYPE_SELL)
                  {
                   // 1. Break-Even Check
-                  if(UseBreakEvenProtection && (current_sl>open_price || current_sl==0.0))
+                  if(!spread_frozen && UseBreakEvenProtection && (current_sl>open_price || current_sl==0.0))
                     {
                      bool be_trig=(live_atr>0.0) ? (p_tick.ask<=open_price-BreakEvenTriggerATR*live_atr) : (p_tick.ask<=open_price-spread*2.0 && current_profit>0.50);
                      if(be_trig)
@@ -322,7 +323,7 @@ void GSProcess(const bool evaluate_signal)
                        }
                     }
                   // 2. Stepped Profit Lock (1.5 ATR -> +0.5, 2.0 ATR -> +1.0, 3.0 ATR -> +2.0)
-                  if(UseSteppedProfitLock && live_atr>0.0)
+                  if(!spread_frozen && UseSteppedProfitLock && live_atr>0.0)
                     {
                      double gain=open_price-p_tick.ask;
                      double gain_atr=gain/live_atr;
@@ -342,7 +343,7 @@ void GSProcess(const bool evaluate_signal)
                        }
                     }
                   // 3. Trailing Stop Check (aktif setelah SL terkunci di bawah modal)
-                  if(UseTrailingStop && current_sl<=open_price && current_sl>0.0 && live_atr>0.0)
+                  if(!spread_frozen && UseTrailingStop && current_sl<=open_price && current_sl>0.0 && live_atr>0.0)
                     {
                      double trail_dist=(has_partial && UseAggressiveRunnerTrailing) ? (PartialTrailingATR*live_atr) : (TrailingStopATR*live_atr);
                      if(UseAdaptiveADXTrailing && live_adx>0.0 && live_adx<25.0)

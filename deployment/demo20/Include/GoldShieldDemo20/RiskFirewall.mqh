@@ -52,6 +52,16 @@ private:
             (now.hour==0 && now.min<RolloverEndMinute))
             return GSReject(reason,"HOLD_MIDNIGHT_ROLLOVER");
         }
+      if(UseWeeklyOpenGuard)
+        {
+         bool is_crypto=(StringFind(symbol,"BTC")>=0 || StringFind(symbol,"ETH")>=0 || StringFind(symbol,"SOL")>=0);
+         if(!is_crypto)
+           {
+            if((now.day_of_week==1 && now.hour==0 && now.min<WeeklyOpenWaitMinutes) ||
+               (now.day_of_week==0 && now.hour>=22))
+               return GSReject(reason,"HOLD_WEEKLY_OPEN_STABILIZATION");
+           }
+        }
       if(UseFridayCloseGuard)
         {
          bool is_crypto=(StringFind(symbol,"BTC")>=0 || StringFind(symbol,"ETH")>=0 || StringFind(symbol,"SOL")>=0);

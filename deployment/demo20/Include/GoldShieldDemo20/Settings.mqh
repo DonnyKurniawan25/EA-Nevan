@@ -77,6 +77,13 @@ input bool UseRSIMomentumThreshold=true; // Filter deviasi momentum RSI menjauhi
 input double RSIMomentumThreshold=2.0; // Deviasi minimal RSI dari 50 (BUY >= 52, SELL <= 48)
 input bool UseAdaptiveADXTrailing=true; // Trailing adaptif responsif saat tren ADX rendah (< 25)
 input double AdaptiveLowADXTrailingATR=0.8; // Jarak trailing saat ADX < 25 dalam kelipatan ATR (0.8 ATR)
+input bool UseDailyProfitLock=true; // Kunci kemenangan harian: berhenti buka posisi baru jika target harian tercapai
+input double DailyProfitTargetPct=2.0; // Target profit harian dalam % dari modal (2.0 = 2%)
+input double DailyProfitTargetUSD=0.0; // Target profit harian alternatif dalam USD (0 = gunakan %)
+input bool UseWeeklyOpenGuard=true; // Blokir entri 30 menit awal pembukaan bursa emas (anti-gap & spread)
+input int WeeklyOpenWaitMinutes=30; // Menit tunggu setelah pembukaan bursa Senin (00:00 - 00:30)
+input bool SpreadFreezeOnTrailing=true; // Bekukan modifikasi trailing stop jika spread sedang melebar tajam
+input double MaxNewsCandleATRMultiple=2.5; // Batas rentang candle M15 vs ATR (deteksi lonjakan berita ekstrim)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.05; // Maximum requested volume; never rounded up.
@@ -191,6 +198,9 @@ bool GSValidateSettings(string &reason)
       MinCandleBodyRatio<0.0 || MinCandleBodyRatio>0.90 ||
       RSIMomentumThreshold<0.0 || RSIMomentumThreshold>10.0 ||
       !GSPositive(AdaptiveLowADXTrailingATR) ||
+      !GSPositive(MaxNewsCandleATRMultiple) ||
+      DailyProfitTargetPct<0.0 || DailyProfitTargetPct>50.0 ||
+      DailyProfitTargetUSD<0.0 || WeeklyOpenWaitMinutes<0 || WeeklyOpenWaitMinutes>120 ||
       LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
