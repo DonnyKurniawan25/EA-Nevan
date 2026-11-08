@@ -84,6 +84,8 @@ input bool UseWeeklyOpenGuard=true; // Blokir entri 30 menit awal pembukaan burs
 input int WeeklyOpenWaitMinutes=30; // Menit tunggu setelah pembukaan bursa Senin (00:00 - 00:30)
 input bool SpreadFreezeOnTrailing=true; // Bekukan modifikasi trailing stop jika spread sedang melebar tajam
 input double MaxNewsCandleATRMultiple=2.5; // Batas rentang candle M15 vs ATR (deteksi lonjakan berita ekstrim)
+input bool UseMidnightProfitClose=true; // Kunci profit floating sebelum rollover tengah malam (non-kripto)
+input int MidnightCloseMinuteServer=50; // Menit server kunci profit sebelum rollover tengah malam (23:50)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.05; // Maximum requested volume; never rounded up.
@@ -201,6 +203,7 @@ bool GSValidateSettings(string &reason)
       !GSPositive(MaxNewsCandleATRMultiple) ||
       DailyProfitTargetPct<0.0 || DailyProfitTargetPct>50.0 ||
       DailyProfitTargetUSD<0.0 || WeeklyOpenWaitMinutes<0 || WeeklyOpenWaitMinutes>120 ||
+      MidnightCloseMinuteServer<0 || MidnightCloseMinuteServer>59 ||
       LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;

@@ -23,6 +23,7 @@ LABELS = {
     "EARLY_REVERSAL_EXIT": "Pembalikan arah tren terdeteksi: Cut loss dini",
     "STOP_MODIFY": "Proteksi modal: Stop Loss digeser ke Break-Even (Rp0 risiko)",
     "FRIDAY_PRE_CLOSE": "Proteksi akhir pekan: Posisi ditutup otomatis jelang libur bursa (Anti-Gap)",
+    "MIDNIGHT_ROLLOVER_EXIT": "Proteksi rollover: Kunci keuntungan sebelum tengah malam (Anti-Swap)",
     "RSI_EXTREME_PROFIT_EXIT": "Amankan keuntungan: Pucuk RSI ekstrim tercapai",
 }
 ALERT_STATES = {"PAUSED_RISK", "ERROR_BLOCKED", "SAFE_MODE", "PAUSED_MANUAL", "PAUSED_VOLATILITY"}
@@ -38,7 +39,8 @@ CLOSE_TICKET_NO_LONGER_PRESENT CLOSE_OWNERSHIP_REJECTED INDICATOR_HANDLE_ERROR T
 HOLD_VOLATILITY_OR_GAP AUTO_ENTRY_DISABLED HOLD_STALE_TICK HOLD_TICK_UNAVAILABLE
 TIME_EXIT_PROFIT HOLD_DURATION_TARGET_UNREACHED EARLY_REVERSAL_EXIT TREND_INVALIDATED_CUT_LOSS BREAK_EVEN TRAILING_STOP
 STEPPED_PROFIT_LOCK RSI_EXTREME_PROFIT_EXIT RSI_OVERBOUGHT_EXHAUSTION RSI_OVERSOLD_EXHAUSTION
-HOLD_HTF_SLOPE_FLAT_OR_FALLING HOLD_HTF_SLOPE_FLAT_OR_RISING""".split())
+HOLD_HTF_SLOPE_FLAT_OR_FALLING HOLD_HTF_SLOPE_FLAT_OR_RISING
+MIDNIGHT_ROLLOVER_EXIT SWAP_AND_SPREAD_PREVENTION MIDNIGHT_PROFIT_CLOSE""".split())
 
 EVENT_ICONS = {
     "SIGNAL": "🔔",
@@ -56,12 +58,15 @@ EVENT_ICONS = {
     "PARTIAL_CLOSE": "🎯",
     "STOP_MODIFY": "🛡️",
     "FRIDAY_PRE_CLOSE": "🛡️",
+    "MIDNIGHT_ROLLOVER_EXIT": "🌙",
     "RSI_EXTREME_PROFIT_EXIT": "💎",
     "STATE": "ℹ️",
 }
 
 REASON_DESCRIPTIONS = {
     "TIME_EXIT_PROFIT": "Target waktu 30 menit tercapai (amankan profit)",
+    "MIDNIGHT_PROFIT_CLOSE": "Kunci profit sebelum rollover tengah malam (hindari biaya swap & spread)",
+    "SWAP_AND_SPREAD_PREVENTION": "Kunci profit sebelum rollover tengah malam (hindari swap & spread mekar)",
     "HOLD_DURATION_TARGET_UNREACHED": "Target waktu tahan selesai saat posisi untung",
     "TREND_INVALIDATED_CUT_LOSS": "Pembalikan tren terdeteksi (cut loss dini)",
     "BREAK_EVEN": "Proteksi modal: Stop Loss digeser ke harga modal",

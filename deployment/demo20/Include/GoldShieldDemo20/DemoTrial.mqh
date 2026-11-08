@@ -122,6 +122,50 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
    if(!history) trial="HISTORY_UNAVAILABLE_REVIEW_REQUIRED";
    g_demo20_panel=StringFormat("UJI DEMO: %d/20 pengiriman | %d selesai | menang %d / rugi %d\nNet tertutup %.2f %s | %s",
                              used,closed,wins,losses,net,AccountInfoString(ACCOUNT_CURRENCY),trial);
+
+   // Telemetri live streaming real-time: tiap detik saat ada posisi, tiap 10 detik saat flat
+   static datetime last_telemetry=0;
+   if(owned.count>0 || now-last_telemetry>=10)
+     {
+      last_telemetry=now;
+      int acc_file=FileOpen("GoldShield\\account_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
+      if(acc_file!=INVALID_HANDLE)
+        {
+         FileWrite(acc_file,"time_server","balance","equity","currency","open_positions");
+         FileWrite(acc_file,TimeToString(now,TIME_DATE|TIME_SECONDS),
+                   DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE),2),
+                   DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),2),
+                   AccountInfoString(ACCOUNT_CURRENCY),IntegerToString(owned.count));
+         FileFlush(acc_file); FileClose(acc_file);
+        }
+
+      int pos_file=FileOpen("GoldShield\\positions_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
+      if(pos_file!=INVALID_HANDLE)
+        {
+         FileWrite(pos_file,"ticket","symbol","type","volume","open_price","current_price","sl","tp","profit");
+         for(int p=PositionsTotal()-1;p>=0;p--)
+           {
+            ulong pt=PositionGetTicket(p);
+            if(pt>0 && PositionSelectByTicket(pt))
+              {
+               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+                 {
+                  FileWrite(pos_file,IntegerToString(pt),
+                            PositionGetString(POSITION_SYMBOL),
+                            ((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? "BUY" : "SELL"),
+                            DoubleToString(PositionGetDouble(POSITION_VOLUME),2),
+                            DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN),_Digits),
+                            DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT),_Digits),
+                            DoubleToString(PositionGetDouble(POSITION_SL),_Digits),
+                            DoubleToString(PositionGetDouble(POSITION_TP),_Digits),
+                            DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2));
+                 }
+              }
+           }
+         FileFlush(pos_file); FileClose(pos_file);
+        }
+     }
+
    string next=StringFormat("%d|%d|%d|%d|%s|%s",used,closed,wins,owned.count,EnumToString(state.State()),state.Reason());
    if(next==signature) return;
    signature=next;
@@ -132,43 +176,6 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
    FileWrite(file,TimeToString(now,TIME_DATE|TIME_SECONDS),"DEMO",TradeSymbol,GS_DEMO20_LIMIT,used,entries,closed,
              wins,losses,net,AccountInfoString(ACCOUNT_CURRENCY),owned.count,trial,EnumToString(state.State()),state.Reason());
    FileFlush(file); FileClose(file);
-
-   int acc_file=FileOpen("GoldShield\\account_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
-   if(acc_file!=INVALID_HANDLE)
-     {
-      FileWrite(acc_file,"time_server","balance","equity","currency","open_positions");
-      FileWrite(acc_file,TimeToString(now,TIME_DATE|TIME_SECONDS),
-                DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE),2),
-                DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),2),
-                AccountInfoString(ACCOUNT_CURRENCY),IntegerToString(owned.count));
-      FileFlush(acc_file); FileClose(acc_file);
-     }
-
-   int pos_file=FileOpen("GoldShield\\positions_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
-   if(pos_file!=INVALID_HANDLE)
-     {
-      FileWrite(pos_file,"ticket","symbol","type","volume","open_price","current_price","sl","tp","profit");
-      for(int p=PositionsTotal()-1;p>=0;p--)
-        {
-         ulong pt=PositionGetTicket(p);
-         if(pt>0 && PositionSelectByTicket(pt))
-           {
-            if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
-              {
-               FileWrite(pos_file,IntegerToString(pt),
-                         PositionGetString(POSITION_SYMBOL),
-                         ((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? "BUY" : "SELL"),
-                         DoubleToString(PositionGetDouble(POSITION_VOLUME),2),
-                         DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN),_Digits),
-                         DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT),_Digits),
-                         DoubleToString(PositionGetDouble(POSITION_SL),_Digits),
-                         DoubleToString(PositionGetDouble(POSITION_TP),_Digits),
-                         DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2));
-              }
-           }
-        }
-      FileFlush(pos_file); FileClose(pos_file);
-     }
 
    int deal_file=FileOpen("GoldShield\\history_deals.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
    if(deal_file!=INVALID_HANDLE)

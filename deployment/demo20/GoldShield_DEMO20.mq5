@@ -143,6 +143,36 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
+   // Rule 0.5: Midnight Rollover Profit Lock & Swap Avoidance (Non-Crypto)
+   if(UseMidnightProfitClose && g_owned.count>0)
+     {
+      MqlDateTime broker_time;
+      if(TimeToStruct(TimeTradeServer(),broker_time))
+        {
+         bool is_crypto=(StringFind(TradeSymbol,"BTC")>=0 || StringFind(TradeSymbol,"ETH")>=0 || StringFind(TradeSymbol,"SOL")>=0);
+         if(!is_crypto && broker_time.hour==23 && broker_time.min>=MidnightCloseMinuteServer)
+           {
+            for(int i=PositionsTotal()-1;i>=0;i--)
+              {
+               ulong t=PositionGetTicket(i);
+               if(t==0 || !PositionSelectByTicket(t)) continue;
+               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+                 {
+                  double profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+                  if(profit>0.0)
+                    {
+                     string c_reason="";
+                     if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"MIDNIGHT_PROFIT_CLOSE"))
+                       {
+                        g_log.Event("MIDNIGHT_ROLLOVER_EXIT","SWAP_AND_SPREAD_PREVENTION",StringFormat("ticket=%I64u profit=%.2f",t,profit));
+                       }
+                    }
+                 }
+              }
+           }
+        }
+     }
+
    // Rule 1: Time-based profit exit (MaxHoldMinutes)
    if(MaxHoldMinutes>0 && g_owned.count>0)
      {

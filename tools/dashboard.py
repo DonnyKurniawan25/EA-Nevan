@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 from http import HTTPStatus
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
@@ -1155,7 +1155,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 
 def run_server(port=DEFAULT_PORT, host=DEFAULT_HOST):
-    server = HTTPServer((host, port), DashboardHandler)
+    server = ThreadingHTTPServer((host, port), DashboardHandler)
     PID_FILE.write_text(str(os.getpid()))
     print(f"GoldShield Dashboard listening on http://{host}:{port}/")
     try:
