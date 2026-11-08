@@ -54,7 +54,7 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_NO_FRESH_TRIGGER"; return GS_HOLD; }
      }
 
-   // Prioritas 2: Multi-Timeframe Trend Filter (M15 + H1 EMA)
+   // Prioritas 2: Multi-Timeframe Trend Filter (M15 + H1 EMA) & Slope Alignment
    if(side!=0 && UseHTFTrendFilter)
      {
       if(!GSPositive(data.trend_close) || !GSPositive(data.trend_fast_ema) || !GSPositive(data.trend_slow_ema))
@@ -63,11 +63,15 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         {
          if(data.trend_close<data.trend_slow_ema || data.trend_fast_ema<data.trend_slow_ema)
            { reason="HOLD_HTF_TREND_BEARISH"; return GS_HOLD; }
+         if(RequireHTFSlopeAlignment && GSPositive(data.previous_trend_fast_ema) && data.trend_fast_ema<=data.previous_trend_fast_ema)
+           { reason="HOLD_HTF_SLOPE_FLAT_OR_FALLING"; return GS_HOLD; }
         }
       else if(side==-1)
         {
          if(data.trend_close>data.trend_slow_ema || data.trend_fast_ema>data.trend_slow_ema)
            { reason="HOLD_HTF_TREND_BULLISH"; return GS_HOLD; }
+         if(RequireHTFSlopeAlignment && GSPositive(data.previous_trend_fast_ema) && data.trend_fast_ema>=data.previous_trend_fast_ema)
+           { reason="HOLD_HTF_SLOPE_FLAT_OR_RISING"; return GS_HOLD; }
         }
      }
 

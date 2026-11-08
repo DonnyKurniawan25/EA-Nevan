@@ -83,7 +83,7 @@ void GSProcess(const bool evaluate_signal)
      }
    if(g_had_position && g_owned.count==0)
      {
-      if(!g_storage.SetCooldown(TimeTradeServer()+CooldownMinutes*60)) g_storage.Block();
+      int effective_cooldown=CooldownMinutes;
       double last_deal_profit=0.0;
       ulong last_pos_id=0;
       bool found_deal=false;
@@ -104,8 +104,11 @@ void GSProcess(const bool evaluate_signal)
               }
            }
         }
+      if(found_deal && last_deal_profit<0.0 && UseDynamicLossCooldown)
+         effective_cooldown=LossCooldownMinutes;
+      if(!g_storage.SetCooldown(TimeTradeServer()+effective_cooldown*60)) g_storage.Block();
       if(found_deal)
-         g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY",StringFormat("ticket=%I64u profit=%.2f",last_pos_id,last_deal_profit));
+         g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY",StringFormat("ticket=%I64u profit=%.2f cooldown=%dm",last_pos_id,last_deal_profit,effective_cooldown));
       else
          g_log.Event("POSITION_CLOSED","BROKER_SNAPSHOT_EMPTY","Realized net P/L not calculated in Phase 1");
      }
@@ -236,6 +239,9 @@ void GSProcess(const bool evaluate_signal)
                     }
                  }
                double min_dist=(double)MathMax(g_symbol.stops_level,g_symbol.freeze_level)*point+g_symbol.tick_size;
+               string partial_key=StringFormat("tp1_closed_%I64u",t);
+               bool has_partial=(g_storage.Get(partial_key)>0.5);
+
                if(p_type==POSITION_TYPE_BUY)
                  {
                   // 1. Break-Even Check
@@ -253,10 +259,30 @@ void GSProcess(const bool evaluate_signal)
                           }
                        }
                     }
-                  // 2. Trailing Stop Check (aktif setelah SL terkunci di atas modal)
+                  // 2. Stepped Profit Lock (1.5 ATR -> +0.5, 2.0 ATR -> +1.0, 3.0 ATR -> +2.0)
+                  if(UseSteppedProfitLock && live_atr>0.0)
+                    {
+                     double gain=p_tick.bid-open_price;
+                     double gain_atr=gain/live_atr;
+                     double locked_profit=0.0;
+                     if(gain_atr>=3.0) locked_profit=2.0*live_atr;
+                     else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
+                     else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                     if(locked_profit>0.0)
+                       {
+                        double step_sl=NormalizeDouble(open_price+locked_profit,digits);
+                        if(step_sl>current_sl && p_tick.bid-step_sl>=min_dist)
+                          {
+                           string step_reason="";
+                           g_executor.ModifyStops(t,step_sl,current_tp,g_risk,g_log,step_reason,"STEPPED_PROFIT_LOCK");
+                           current_sl=step_sl;
+                          }
+                       }
+                    }
+                  // 3. Trailing Stop Check (aktif setelah SL terkunci di atas modal)
                   if(UseTrailingStop && current_sl>=open_price && live_atr>0.0)
                     {
-                     double trail_dist=TrailingStopATR*live_atr;
+                     double trail_dist=(has_partial && UseAggressiveRunnerTrailing) ? (PartialTrailingATR*live_atr) : (TrailingStopATR*live_atr);
                      double trail_step=TrailingStepATR*live_atr;
                      double target_sl=NormalizeDouble(p_tick.bid-trail_dist,digits);
                      if(target_sl>p_tick.bid-min_dist)
@@ -285,10 +311,30 @@ void GSProcess(const bool evaluate_signal)
                           }
                        }
                     }
-                  // 2. Trailing Stop Check (aktif setelah SL terkunci di bawah modal)
+                  // 2. Stepped Profit Lock (1.5 ATR -> +0.5, 2.0 ATR -> +1.0, 3.0 ATR -> +2.0)
+                  if(UseSteppedProfitLock && live_atr>0.0)
+                    {
+                     double gain=open_price-p_tick.ask;
+                     double gain_atr=gain/live_atr;
+                     double locked_profit=0.0;
+                     if(gain_atr>=3.0) locked_profit=2.0*live_atr;
+                     else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
+                     else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                     if(locked_profit>0.0)
+                       {
+                        double step_sl=NormalizeDouble(open_price-locked_profit,digits);
+                        if((step_sl<current_sl || current_sl==0.0) && step_sl-p_tick.ask>=min_dist)
+                          {
+                           string step_reason="";
+                           g_executor.ModifyStops(t,step_sl,current_tp,g_risk,g_log,step_reason,"STEPPED_PROFIT_LOCK");
+                           current_sl=step_sl;
+                          }
+                       }
+                    }
+                  // 3. Trailing Stop Check (aktif setelah SL terkunci di bawah modal)
                   if(UseTrailingStop && current_sl<=open_price && current_sl>0.0 && live_atr>0.0)
                     {
-                     double trail_dist=TrailingStopATR*live_atr;
+                     double trail_dist=(has_partial && UseAggressiveRunnerTrailing) ? (PartialTrailingATR*live_atr) : (TrailingStopATR*live_atr);
                      double trail_step=TrailingStepATR*live_atr;
                      double target_sl=NormalizeDouble(p_tick.ask+trail_dist,digits);
                      if(target_sl<p_tick.ask+min_dist)
@@ -305,9 +351,9 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
-   // Rule 3: Early Reversal Exit (Deteksi "bakalan minus" dari closed bar M15)
+   // Rule 3: Early Reversal Exit & RSI Overbought/Oversold Profit Protector
    datetime current_bar=iTime(TradeSymbol,SignalTimeframe,0);
-   if(UseEarlyReversalExit && g_owned.count>0 && current_bar>0 && current_bar!=g_observed_exit_bar)
+   if(g_owned.count>0 && current_bar>0 && current_bar!=g_observed_exit_bar)
      {
       g_observed_exit_bar=current_bar;
       GSMarketSnapshot data;
@@ -321,33 +367,60 @@ void GSProcess(const bool evaluate_signal)
             if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
               {
                ENUM_POSITION_TYPE p_type=(ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+               double cur_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
                bool should_exit_early=false;
                string exit_detail="";
-               if(p_type==POSITION_TYPE_BUY)
+               string exit_action="EARLY_REVERSAL_EXIT";
+               string exit_sub="TREND_INVALIDATED_CUT_LOSS";
+
+               // 1. RSI Extreme Profit Protector (Amankan profit saat RSI mencapai titik jenuh)
+               if(UseRSIProfitProtector && cur_profit>0.0)
                  {
-                  if((data.bar.close<data.fast_ema-data.atr*ReversalBufferATR) ||
-                     (data.rsi<50.0-ReversalRSIThreshold))
+                  if(p_type==POSITION_TYPE_BUY && data.rsi>=RSIExtremeOverbought)
                     {
                      should_exit_early=true;
-                     exit_detail=StringFormat("BUY_REVERSAL close=%.2f ema=%.2f rsi=%.2f buf=%.2f",data.bar.close,data.fast_ema,data.rsi,data.atr*ReversalBufferATR);
+                     exit_action="RSI_EXTREME_PROFIT_EXIT";
+                     exit_sub="RSI_OVERBOUGHT_EXHAUSTION";
+                     exit_detail=StringFormat("BUY_RSI_OVERBOUGHT rsi=%.2f limit=%.2f",data.rsi,RSIExtremeOverbought);
                     }
-                 }
-               else if(p_type==POSITION_TYPE_SELL)
-                 {
-                  if((data.bar.close>data.fast_ema+data.atr*ReversalBufferATR) ||
-                     (data.rsi>50.0+ReversalRSIThreshold))
+                  else if(p_type==POSITION_TYPE_SELL && data.rsi<=RSIExtremeOversold)
                     {
                      should_exit_early=true;
-                     exit_detail=StringFormat("SELL_REVERSAL close=%.2f ema=%.2f rsi=%.2f buf=%.2f",data.bar.close,data.fast_ema,data.rsi,data.atr*ReversalBufferATR);
+                     exit_action="RSI_EXTREME_PROFIT_EXIT";
+                     exit_sub="RSI_OVERSOLD_EXHAUSTION";
+                     exit_detail=StringFormat("SELL_RSI_OVERSOLD rsi=%.2f limit=%.2f",data.rsi,RSIExtremeOversold);
                     }
                  }
+
+               // 2. Early Trend Reversal Cut-Loss
+               if(!should_exit_early && UseEarlyReversalExit)
+                 {
+                  if(p_type==POSITION_TYPE_BUY)
+                    {
+                     if((data.bar.close<data.fast_ema-data.atr*ReversalBufferATR) ||
+                        (data.rsi<50.0-ReversalRSIThreshold))
+                       {
+                        should_exit_early=true;
+                        exit_detail=StringFormat("BUY_REVERSAL close=%.2f ema=%.2f rsi=%.2f buf=%.2f",data.bar.close,data.fast_ema,data.rsi,data.atr*ReversalBufferATR);
+                       }
+                    }
+                  else if(p_type==POSITION_TYPE_SELL)
+                    {
+                     if((data.bar.close>data.fast_ema+data.atr*ReversalBufferATR) ||
+                        (data.rsi>50.0+ReversalRSIThreshold))
+                       {
+                        should_exit_early=true;
+                        exit_detail=StringFormat("SELL_REVERSAL close=%.2f ema=%.2f rsi=%.2f buf=%.2f",data.bar.close,data.fast_ema,data.rsi,data.atr*ReversalBufferATR);
+                       }
+                    }
+                 }
+
                if(should_exit_early)
                  {
-                  double cur_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
                   string c_reason="";
-                  if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"EARLY_REVERSAL_EXIT"))
+                  if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,exit_action))
                     {
-                     g_log.Event("EARLY_REVERSAL_EXIT","TREND_INVALIDATED_CUT_LOSS",
+                     g_log.Event(exit_action,exit_sub,
                                  StringFormat("ticket=%I64u profit=%.2f detail=%s",t,cur_profit,exit_detail));
                     }
                  }

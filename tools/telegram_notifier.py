@@ -23,6 +23,7 @@ LABELS = {
     "EARLY_REVERSAL_EXIT": "Pembalikan arah tren terdeteksi: Cut loss dini",
     "STOP_MODIFY": "Proteksi modal: Stop Loss digeser ke Break-Even (Rp0 risiko)",
     "FRIDAY_PRE_CLOSE": "Proteksi akhir pekan: Posisi ditutup otomatis jelang libur bursa (Anti-Gap)",
+    "RSI_EXTREME_PROFIT_EXIT": "Amankan keuntungan: Pucuk RSI ekstrim tercapai",
 }
 ALERT_STATES = {"PAUSED_RISK", "ERROR_BLOCKED", "SAFE_MODE", "PAUSED_MANUAL", "PAUSED_VOLATILITY"}
 REASONS = set("""BASELINE_RULES RECONCILIATION_REQUIRED BROKER_PREFLIGHT_REJECTED BROKER_POSITION_PRESENT
@@ -35,7 +36,9 @@ DEMO20_SLOT_VERIFY_FAILED ORDER_INTENT_AUDIT_WRITE_FAILED BROKER_PREFLIGHT_MARGI
 DURABLE_ENTRY_INTENT_FAILED CLOSE_RETRY_LIMIT_OPERATOR_REQUIRED CLOSE_RETRY_BACKOFF
 CLOSE_TICKET_NO_LONGER_PRESENT CLOSE_OWNERSHIP_REJECTED INDICATOR_HANDLE_ERROR TIMER_ERROR
 HOLD_VOLATILITY_OR_GAP AUTO_ENTRY_DISABLED HOLD_STALE_TICK HOLD_TICK_UNAVAILABLE
-TIME_EXIT_PROFIT HOLD_DURATION_TARGET_UNREACHED EARLY_REVERSAL_EXIT TREND_INVALIDATED_CUT_LOSS BREAK_EVEN TRAILING_STOP""".split())
+TIME_EXIT_PROFIT HOLD_DURATION_TARGET_UNREACHED EARLY_REVERSAL_EXIT TREND_INVALIDATED_CUT_LOSS BREAK_EVEN TRAILING_STOP
+STEPPED_PROFIT_LOCK RSI_EXTREME_PROFIT_EXIT RSI_OVERBOUGHT_EXHAUSTION RSI_OVERSOLD_EXHAUSTION
+HOLD_HTF_SLOPE_FLAT_OR_FALLING HOLD_HTF_SLOPE_FLAT_OR_RISING""".split())
 
 EVENT_ICONS = {
     "SIGNAL": "🔔",
@@ -53,6 +56,7 @@ EVENT_ICONS = {
     "PARTIAL_CLOSE": "🎯",
     "STOP_MODIFY": "🛡️",
     "FRIDAY_PRE_CLOSE": "🛡️",
+    "RSI_EXTREME_PROFIT_EXIT": "💎",
     "STATE": "ℹ️",
 }
 
@@ -61,6 +65,9 @@ REASON_DESCRIPTIONS = {
     "HOLD_DURATION_TARGET_UNREACHED": "Target waktu tahan selesai saat posisi untung",
     "TREND_INVALIDATED_CUT_LOSS": "Pembalikan tren terdeteksi (cut loss dini)",
     "BREAK_EVEN": "Proteksi modal: Stop Loss digeser ke harga modal",
+    "STEPPED_PROFIT_LOCK": "Kunci profit bertingkat (Stop Loss dinaikkan ke zona profit)",
+    "RSI_OVERBOUGHT_EXHAUSTION": "Indikator RSI jenuh beli ekstrim (take profit penuh)",
+    "RSI_OVERSOLD_EXHAUSTION": "Indikator RSI jenuh jual ekstrim (take profit penuh)",
     "TAKE_PROFIT_1": "Target keuntungan 1 tercapai (50% posisi ditutup & profit diamankan)",
     "PARTIAL_TP_BREAK_EVEN": "Proteksi modal: Stop Loss sisa posisi digeser ke harga modal",
     "TP1_LOCK_BREAK_EVEN": "Target keuntungan 1 tercapai: Stop Loss dikunci ke harga modal",
@@ -77,6 +84,8 @@ REASON_DESCRIPTIONS = {
     "HOLD_SESSION_FILTER_CLOSED": "Di luar jadwal jam sesi trading aktif",
     "HOLD_HTF_TREND_BEARISH": "Tren H1 sedang turun (bearish), sinyal beli M15 dibatalkan",
     "HOLD_HTF_TREND_BULLISH": "Tren H1 sedang naik (bullish), sinyal jual M15 dibatalkan",
+    "HOLD_HTF_SLOPE_FLAT_OR_FALLING": "Kemiringan tren H1 mendatar/turun (batal BUY)",
+    "HOLD_HTF_SLOPE_FLAT_OR_RISING": "Kemiringan tren H1 mendatar/naik (batal SELL)",
     "HOLD_ADX_SIDEWAYS": "Pasar sedang sideways/flat (kekuatan tren lemah, ADX < batas aman)",
     "HOLD_CANDLE_BEARISH": "Candle M15 Berwarna Merah (Menolak BUY)",
     "HOLD_CANDLE_BULLISH": "Candle M15 Berwarna Hijau (Menolak SELL)",
@@ -127,6 +136,8 @@ def audit_message(row):
         signature = match[1] + ":" + (item["reason_code"] if item["reason_code"] in REASONS else "OTHER")
     elif event == "STOP_MODIFY" and item.get("reason_code") == "TRAILING_STOP":
         label = "Kunci keuntungan: Stop Loss digeser (Trailing Stop)"
+    elif event == "STOP_MODIFY" and item.get("reason_code") == "STEPPED_PROFIT_LOCK":
+        label = "Kunci keuntungan: Stop Loss dinaikkan berjenjang (Stepped Profit Lock)"
     elif event == "SIGNAL":
         match = re.match(r"^(GS_BUY|GS_SELL)\b", item["details"])
         if not match:

@@ -31,6 +31,7 @@ struct GSMarketSnapshot
    double trend_close;
    double trend_fast_ema;
    double trend_slow_ema;
+   double previous_trend_fast_ema;
    datetime trend_available_at_server;
   };
 struct GSTradePlan

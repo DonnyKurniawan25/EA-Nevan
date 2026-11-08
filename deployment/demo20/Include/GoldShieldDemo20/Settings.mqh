@@ -57,6 +57,15 @@ input bool RequireSameDirectionMulti=true; // Posisi tambahan (multi-posisi) waj
 input bool UseMinATRFilter=true; // Tolak entri jika ATR terlalu kecil (pasar mati / likuiditas nol)
 input double MinATRPoints=20.0; // Batas minimal ATR dalam points
 input double EMAPenetrationBufferATR=0.10; // Buffer penetrasi harga terhadap EMA (0.10 = 10% ATR)
+input bool UseSteppedProfitLock=true; // Kunci profit berjenjang (1.5 ATR->+0.5, 2.0 ATR->+1.0, 3.0 ATR->+2.0)
+input bool UseRSIProfitProtector=true; // Amankan profit saat RSI mencapai titik jenuh ekstrim
+input double RSIExtremeOverbought=75.0; // Level jenuh beli untuk profit taking
+input double RSIExtremeOversold=25.0; // Level jenuh jual untuk profit taking
+input bool UseDynamicLossCooldown=true; // Jeda ekstra setelah transaksi rugi (hindari whipsaw)
+input int LossCooldownMinutes=60; // Durasi cooldown pasca-rugi dalam menit
+input bool UseAggressiveRunnerTrailing=true; // Trailing lebih ketat untuk sisa volume setelah TP 1
+input double PartialTrailingATR=0.7; // Jarak trailing runner pasca TP 1 dalam kelipatan ATR
+input bool RequireHTFSlopeAlignment=true; // Kemiringan EMA tren H1 wajib searah (bukan datar)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.01; // Maximum requested volume; never rounded up.
@@ -162,7 +171,10 @@ bool GSValidateSettings(string &reason)
       MinTickVolumeRatio<0.1 || MinTickVolumeRatio>3.0 ||
       FridayCloseHourServer<0 || FridayCloseHourServer>23 ||
       FridayCloseMinuteServer<0 || FridayCloseMinuteServer>59 ||
-      MinATRPoints<0.0 || EMAPenetrationBufferATR<0.0 || EMAPenetrationBufferATR>1.0)
+      MinATRPoints<0.0 || EMAPenetrationBufferATR<0.0 || EMAPenetrationBufferATR>1.0 ||
+      RSIExtremeOverbought<=50.0 || RSIExtremeOverbought>=100.0 ||
+      RSIExtremeOversold<=0.0 || RSIExtremeOversold>=50.0 ||
+      LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
   }

@@ -119,6 +119,7 @@ public:
          MqlRates trend[1];
          if(CopyRates(m_symbol,m_trend_timeframe,1,1,trend)!=1 ||
             !ReadValue(m_trend_fast,snapshot.trend_fast_ema) ||
+            !ReadPrevious(m_trend_fast,snapshot.previous_trend_fast_ema) ||
             !ReadValue(m_trend_slow,snapshot.trend_slow_ema) ||
             !GSValidOHLC(trend[0].open,trend[0].high,trend[0].low,trend[0].close) ||
             !GSPositive(snapshot.trend_fast_ema) || !GSPositive(snapshot.trend_slow_ema))
