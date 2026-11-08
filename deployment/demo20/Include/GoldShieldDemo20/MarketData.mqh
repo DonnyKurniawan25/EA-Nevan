@@ -106,7 +106,7 @@ public:
          return GSReject(reason,"HOLD_INVALID_INDICATOR");
       if(m_use_adx)
         {
-         if(!ReadValue(m_adx,snapshot.adx) || !MathIsValidNumber(snapshot.adx) ||
+         if(!ReadValue(m_adx,snapshot.adx) || !ReadPrevious(m_adx,snapshot.previous_adx) || !MathIsValidNumber(snapshot.adx) ||
             snapshot.adx<0.0 || snapshot.adx>100.0)
             return GSReject(reason,"HOLD_INVALID_ADX");
         }

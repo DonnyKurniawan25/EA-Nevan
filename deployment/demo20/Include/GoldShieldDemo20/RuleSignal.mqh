@@ -20,6 +20,12 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_ADX_DATA_INVALID"; return GS_HOLD; }
       if(data.adx<ADXThreshold)
         { reason="HOLD_ADX_SIDEWAYS"; return GS_HOLD; }
+      // Pengimbang ADX rendah (20-25): momentum wajib sedang menguat (ADX menanjak)
+      if(RequireRisingADX && data.adx<25.0 && GSPositive(data.previous_adx))
+        {
+         if(data.adx<=data.previous_adx)
+           { reason="HOLD_ADX_MOMENTUM_FALLING"; return GS_HOLD; }
+        }
      }
 
    // Filter likuiditas pasar mati via Min ATR
@@ -31,6 +37,15 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
      }
 
    int side=GSBaselineSide(data.bar.close,data.fast_ema,data.slow_ema,data.rsi,UseRSIFilter);
+
+   // Filter RSI momentum: hindari sinyal ragu-ragu di sekitar garis 50
+   if(side!=0 && UseRSIMomentumThreshold && RSIMomentumThreshold>0.0)
+     {
+      if(side==1 && data.rsi<50.0+RSIMomentumThreshold)
+        { reason="HOLD_RSI_MOMENTUM_WEAK"; return GS_HOLD; }
+      else if(side==-1 && data.rsi>50.0-RSIMomentumThreshold)
+        { reason="HOLD_RSI_MOMENTUM_WEAK"; return GS_HOLD; }
+     }
 
    // Filter anti-whipsaw: penembusan EMA wajib punya buffer memadai
    if(side!=0 && EMAPenetrationBufferATR>0.0 && GSPositive(data.atr))
@@ -100,6 +115,13 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
            { reason="HOLD_CANDLE_BULLISH"; return GS_HOLD; }
          if(range>0.0 && (data.bar.high-data.bar.close)/range<MinCandleClosePercent/100.0)
            { reason="HOLD_CANDLE_LOWER_WICK_REJECTION"; return GS_HOLD; }
+        }
+      // Filter bobot badan candle M15: hindari doji / lilin banci di ADX rendah
+      if(UseCandleBodyFilter && MinCandleBodyRatio>0.0 && range>0.0)
+        {
+         double body=MathAbs(data.bar.close-data.bar.open);
+         if(body/range<MinCandleBodyRatio)
+           { reason="HOLD_CANDLE_BODY_TOO_SMALL"; return GS_HOLD; }
         }
      }
 

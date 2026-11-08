@@ -174,8 +174,12 @@ void GSProcess(const bool evaluate_signal)
       GSMarketSnapshot data;
       string m_reason="";
       double live_atr=0.0;
+      double live_adx=0.0;
       if(g_market.Read(MinClosedBars,data,m_reason))
+        {
          live_atr=data.atr;
+         live_adx=data.adx;
+        }
       for(int i=PositionsTotal()-1;i>=0;i--)
         {
          ulong t=PositionGetTicket(i);
@@ -286,6 +290,8 @@ void GSProcess(const bool evaluate_signal)
                   if(UseTrailingStop && current_sl>=open_price && live_atr>0.0)
                     {
                      double trail_dist=(has_partial && UseAggressiveRunnerTrailing) ? (PartialTrailingATR*live_atr) : (TrailingStopATR*live_atr);
+                     if(UseAdaptiveADXTrailing && live_adx>0.0 && live_adx<25.0)
+                        trail_dist=MathMin(trail_dist,AdaptiveLowADXTrailingATR*live_atr);
                      double trail_step=TrailingStepATR*live_atr;
                      double target_sl=NormalizeDouble(p_tick.bid-trail_dist,digits);
                      if(target_sl>p_tick.bid-min_dist)
@@ -339,6 +345,8 @@ void GSProcess(const bool evaluate_signal)
                   if(UseTrailingStop && current_sl<=open_price && current_sl>0.0 && live_atr>0.0)
                     {
                      double trail_dist=(has_partial && UseAggressiveRunnerTrailing) ? (PartialTrailingATR*live_atr) : (TrailingStopATR*live_atr);
+                     if(UseAdaptiveADXTrailing && live_adx>0.0 && live_adx<25.0)
+                        trail_dist=MathMin(trail_dist,AdaptiveLowADXTrailingATR*live_atr);
                      double trail_step=TrailingStepATR*live_atr;
                      double target_sl=NormalizeDouble(p_tick.ask+trail_dist,digits);
                      if(target_sl<p_tick.ask+min_dist)

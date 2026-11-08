@@ -70,6 +70,13 @@ input int LossCooldownMinutes=60; // Durasi cooldown pasca-rugi dalam menit
 input bool UseAggressiveRunnerTrailing=true; // Trailing lebih ketat untuk sisa volume setelah TP 1
 input double PartialTrailingATR=0.7; // Jarak trailing runner pasca TP 1 dalam kelipatan ATR
 input bool RequireHTFSlopeAlignment=true; // Kemiringan EMA tren H1 wajib searah (bukan datar)
+input bool RequireRisingADX=true; // Momentum ADX wajib sedang menanjak saat ADX < 25 (hindari perlambatan)
+input bool UseCandleBodyFilter=true; // Filter bobot badan candle M15 terhadap rentang total
+input double MinCandleBodyRatio=0.40; // Rasio badan minimal (0.40 = 40% dari high-low, tolak doji tipis)
+input bool UseRSIMomentumThreshold=true; // Filter deviasi momentum RSI menjauhi garis tengah 50
+input double RSIMomentumThreshold=2.0; // Deviasi minimal RSI dari 50 (BUY >= 52, SELL <= 48)
+input bool UseAdaptiveADXTrailing=true; // Trailing adaptif responsif saat tren ADX rendah (< 25)
+input double AdaptiveLowADXTrailingATR=0.8; // Jarak trailing saat ADX < 25 dalam kelipatan ATR (0.8 ATR)
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.05; // Maximum requested volume; never rounded up.
@@ -181,6 +188,9 @@ bool GSValidateSettings(string &reason)
       MinATRPoints<0.0 || EMAPenetrationBufferATR<0.0 || EMAPenetrationBufferATR>1.0 ||
       RSIExtremeOverbought<=50.0 || RSIExtremeOverbought>=100.0 ||
       RSIExtremeOversold<=0.0 || RSIExtremeOversold>=50.0 ||
+      MinCandleBodyRatio<0.0 || MinCandleBodyRatio>0.90 ||
+      RSIMomentumThreshold<0.0 || RSIMomentumThreshold>10.0 ||
+      !GSPositive(AdaptiveLowADXTrailingATR) ||
       LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;
