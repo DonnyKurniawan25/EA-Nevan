@@ -412,6 +412,151 @@ class TelegramSender:
         except Exception:
             raise DeliveryError("Telegram delivery unacknowledged; retained for retry") from None
 
+    def get_updates(self, offset=None, timeout=0):
+        if not hasattr(self, "_token"):
+            return []
+        import urllib.request
+        url = "https://api.telegram.org/bot" + self._token + "/getUpdates"
+        params = {"timeout": timeout, "limit": 10}
+        if offset is not None:
+            params["offset"] = offset
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(params).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with self.open_request(req, timeout=self.timeout) as resp:
+                data = json.loads(resp.read(65537))
+            if data.get("ok") is True:
+                return data.get("result", [])
+        except Exception:
+            pass
+        return []
+
+
+def handle_interactive_command(text, source_dir, state, sender):
+    cmd = text.strip().split()[0].lower() if text.strip() else ""
+    if "@" in cmd:
+        cmd = cmd.split("@")[0]
+
+    source = Path(source_dir)
+    if cmd == "/status":
+        acc_file = source / "account_live.csv"
+        balance = equity = 0.0
+        currency = "USD"
+        open_pos = 0
+        if acc_file.exists():
+            try:
+                lines = acc_file.read_text(errors="ignore").strip().splitlines()
+                if len(lines) >= 2:
+                    parts = lines[1].split(",")
+                    balance = float(parts[1])
+                    equity = float(parts[2])
+                    currency = parts[3]
+                    open_pos = int(parts[4])
+            except Exception:
+                pass
+
+        snapshots = sorted(source.glob("demo20_*.csv"))
+        snap_data = None
+        for p in snapshots:
+            val = snapshot_data(p)
+            if val and (snap_data is None or val.get("closed_positions", 0) >= snap_data.get("closed_positions", 0)):
+                snap_data = val
+
+        is_paused = (source / "MANUAL_PAUSE").exists()
+        status_robot = "⏸️ DIJEDA MANUAL (Order baru diblokir)" if is_paused else "🟢 AKTIF NORMAL (Memantau pasar)"
+
+        floating = equity - balance
+        float_sign = "+" if floating >= 0 else ""
+        float_str = f"{float_sign}{floating:.2f} {currency}" if balance > 0 else "0.00 USD"
+
+        symbol = snap_data.get("symbol", "BTCUSDm") if snap_data else "BTCUSDm"
+        closed = snap_data.get("closed_positions", 0) if snap_data else 0
+        wins = snap_data.get("wins", 0) if snap_data else 0
+        losses = snap_data.get("losses", 0) if snap_data else 0
+        winrate = (wins / closed * 100.0) if closed > 0 else 0.0
+        net_closed = float(snap_data.get("net_closed", 0.0)) if snap_data else 0.0
+        net_sign = "+" if net_closed >= 0 else ""
+        quota = f"{snap_data.get('entry_submissions', 0)}/{snap_data.get('limit', 20)}" if snap_data else "0/20"
+
+        msg = (
+            "📊 STATUS LIVE ROBOT GOLDSHIELD\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Status: {status_robot}\n"
+            f"• Simbol: {symbol} (Timeframe M15)\n"
+            f"• Saldo: ${balance:,.2f} {currency}\n"
+            f"• Ekuitas: ${equity:,.2f} {currency}\n"
+            f"• Floating P/L: {float_str}\n"
+            f"• Posisi Terbuka: {open_pos} Transaksi\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📈 Hasil Trading Hari Ini:\n"
+            f"• Selesai: {closed} (Menang: {wins}, Kalah: {losses})\n"
+            f"• Winrate: {winrate:.1f}%\n"
+            f"• Profit Bersih: {net_sign}{net_closed:.2f} {currency}\n"
+            f"• Kuota Uji DEMO: {quota} Transaksi\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Ketik /recap untuk laporan lengkap atau /help untuk bantuan."
+        )
+        sender(msg)
+        return True
+
+    elif cmd == "/recap":
+        recap_msg = generate_daily_recap(source)
+        if recap_msg:
+            sender(recap_msg)
+        else:
+            sender("ℹ️ Belum ada data rekapitulasi transaksi hari ini.")
+        return True
+
+    elif cmd == "/pause":
+        pause_file = source / "MANUAL_PAUSE"
+        pause_file.write_text("PAUSED")
+        msg = (
+            "⏸️ ROBOT BERHASIL DIJEDA\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "• Mode: Jeda Manual Aktif\n"
+            "• Pembukaan Posisi Baru: DINONAKTIFKAN\n"
+            "• Posisi Berjalan: Tetap dilindungi Stop Loss (2.0 ATR), Take Profit, & Trailing Stop hingga selesai.\n"
+            "• Untuk mengaktifkan kembali, kirim /resume"
+        )
+        sender(msg)
+        return True
+
+    elif cmd == "/resume":
+        pause_file = source / "MANUAL_PAUSE"
+        if pause_file.exists():
+            try:
+                pause_file.unlink()
+            except OSError:
+                pass
+        msg = (
+            "▶️ ROBOT KEMBALI AKTIF\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "• Mode: Normal\n"
+            "• Pembukaan Posisi Baru: DIAKTIFKAN\n"
+            "• Robot kembali aktif memantau sinyal entry M15 sesuai aturan filter."
+        )
+        sender(msg)
+        return True
+
+    elif cmd == "/help":
+        msg = (
+            "🤖 PANDUAN PERINTAH BOT GOLDSHIELD\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "• /status - Cek kondisi robot, saldo, ekuitas, dan posisi aktif saat ini\n"
+            "• /recap - Lihat ringkasan performa trading harian (Winrate, PnL, dll)\n"
+            "• /pause - Jeda pembukaan order baru secara aman (posisi aktif tetap terjaga SL/TP)\n"
+            "• /resume - Aktifkan kembali robot untuk mencari peluang entri baru\n"
+            "• /help - Menampilkan panduan bantuan ini"
+        )
+        sender(msg)
+        return True
+
+    return False
+
 
 class Notifier:
     def __init__(self, source, state_dir, sender, dry_run=False):
@@ -564,6 +709,30 @@ class Notifier:
                         if last_alert_tier > 0.0:
                             self.state["last_drawdown_alert_tier"] = 0.0
                             self.save()
+            except Exception:
+                pass
+
+        # Paket E: Telegram Interactive Commands
+        if hasattr(self.sender, "get_updates"):
+            try:
+                offset = self.state.get("telegram_update_offset") if self.state else None
+                updates = self.sender.get_updates(offset=offset, timeout=0)
+                if offset is None and updates:
+                    self.state["telegram_update_offset"] = updates[-1]["update_id"] + 1
+                    self.save()
+                elif updates:
+                    for upd in updates:
+                        upd_id = upd.get("update_id")
+                        if upd_id is not None:
+                            self.state["telegram_update_offset"] = upd_id + 1
+                            self.save()
+                        msg_obj = upd.get("message", {})
+                        chat_id = str(msg_obj.get("chat", {}).get("id", ""))
+                        if chat_id != str(getattr(self.sender, "chat_id", "")):
+                            continue
+                        text = msg_obj.get("text", "")
+                        if text and text.startswith("/"):
+                            handle_interactive_command(text, self.source, self.state, self.sender)
             except Exception:
                 pass
 

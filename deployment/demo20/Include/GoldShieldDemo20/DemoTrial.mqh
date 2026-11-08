@@ -83,6 +83,8 @@ bool GSDemo20Init(GSStorage &store,const string symbol,const ulong magic,string 
 
 bool GSDemo20CanEnter(GSStorage &store,string &reason)
   {
+   if(FileIsExist("GoldShield\\MANUAL_PAUSE"))
+      return GSReject(reason,"HOLD_PAUSED_BY_USER_COMMAND");
    if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO ||
       store.Get(".d20.schema")!=1 || store.Get(".d20.limit")!=GS_DEMO20_LIMIT)
       return GSReject(reason,"DEMO20_ACCOUNT_OR_LIMIT_INVALID");

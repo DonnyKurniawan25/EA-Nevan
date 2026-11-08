@@ -371,6 +371,34 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("Floating Minus: -$150.00 USD", self.sent[0])
         self.assertIn("Ekuitas Akun: $99,850.00 USD", self.sent[0])
 
+    def test_interactive_commands(self):
+        n = self.notifier()
+        handle = self.module.handle_interactive_command
+        # Test /help
+        res = handle("/help", self.source, n.state, self.sent.append)
+        self.assertTrue(res)
+        self.assertIn("PANDUAN PERINTAH BOT GOLDSHIELD", self.sent[-1])
+
+        # Test /pause
+        res = handle("/pause", self.source, n.state, self.sent.append)
+        self.assertTrue(res)
+        self.assertTrue((self.source / "MANUAL_PAUSE").exists())
+        self.assertIn("ROBOT BERHASIL DIJEDA", self.sent[-1])
+
+        # Test /status
+        acc = self.source / "account_live.csv"
+        acc.write_text("time_server,balance,equity,currency,open_positions\n2026.11.08 02:00:00,100000.0,100050.0,USD,0\n")
+        res = handle("/status", self.source, n.state, self.sent.append)
+        self.assertTrue(res)
+        self.assertIn("STATUS LIVE ROBOT GOLDSHIELD", self.sent[-1])
+        self.assertIn("DIJEDA MANUAL", self.sent[-1])
+
+        # Test /resume
+        res = handle("/resume", self.source, n.state, self.sent.append)
+        self.assertTrue(res)
+        self.assertFalse((self.source / "MANUAL_PAUSE").exists())
+        self.assertIn("ROBOT KEMBALI AKTIF", self.sent[-1])
+
 
 if __name__ == "__main__":
     unittest.main()
