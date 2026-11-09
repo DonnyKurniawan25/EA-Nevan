@@ -11,19 +11,41 @@ string g_demo20_panel="Uji DEMO: maksimum 20 pengiriman entry";
 bool GS20History(const string symbol,const ulong magic,int &entries,int &closed,int &wins,int &losses,double &net)
   {
    entries=0; closed=0; wins=0; losses=0; net=0;
-   if(!HistorySelect(0,TimeTradeServer())) return false;
+   datetime server_time=TimeTradeServer();
+   if(server_time<=0 || !HistorySelect(0,server_time))
+     {
+      for(int a=0;a<15;a++)
+        {
+         Sleep(300);
+         server_time=TimeTradeServer();
+         if(server_time>0 && HistorySelect(0,server_time)) break;
+        }
+     }
+   if(server_time<=0 || !HistorySelect(0,server_time))
+     {
+      Print("GS20History FAIL: HistorySelect false, server_time=",server_time);
+      return false;
+     }
    GS20Position positions[];
    for(int i=0;i<HistoryDealsTotal();i++)
      {
       ulong ticket=HistoryDealGetTicket(i);
-      if(ticket==0) return false;
+      if(ticket==0)
+        {
+         Print("GS20History FAIL: deal ticket 0 at index ",i);
+         return false;
+        }
       if(HistoryDealGetString(ticket,DEAL_SYMBOL)!=symbol || (ulong)HistoryDealGetInteger(ticket,DEAL_MAGIC)!=magic) continue;
       long type=HistoryDealGetInteger(ticket,DEAL_TYPE);
       if(type!=DEAL_TYPE_BUY && type!=DEAL_TYPE_SELL) continue;
       long id=HistoryDealGetInteger(ticket,DEAL_POSITION_ID);
       double volume=HistoryDealGetDouble(ticket,DEAL_VOLUME);
       long entry=HistoryDealGetInteger(ticket,DEAL_ENTRY);
-      if(id<=0 || !GSPositive(volume) || (entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY)) return false;
+      if(id<=0 || !GSPositive(volume) || (entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY))
+        {
+         Print("GS20History FAIL: invalid deal data ticket=",ticket," id=",id," vol=",volume," entry=",entry);
+         return false;
+        }
       int index=-1;
       for(int j=0;j<ArraySize(positions);j++) if(positions[j].id==id) { index=j; break; }
       if(index<0)
@@ -39,10 +61,20 @@ bool GS20History(const string symbol,const ulong magic,int &entries,int &closed,
      }
    for(int i=0;i<ArraySize(positions);i++)
      {
-      if(positions[i].outgoing>positions[i].incoming+1e-8) return false;
-      if(positions[i].incoming>0) entries++;
-      if(positions[i].incoming<=0 || MathAbs(positions[i].incoming-positions[i].outgoing)>1e-8) continue;
-      if(!MathIsValidNumber(positions[i].net)) return false;
+      // Posisi tanpa transaksi masuk (misal order manual yang ditutup dengan magic EA) diabaikan
+      if(positions[i].incoming<=0) continue;
+      if(positions[i].outgoing>positions[i].incoming+1e-8)
+        {
+         Print("GS20History FAIL: outgoing>incoming id=",positions[i].id," in=",positions[i].incoming," out=",positions[i].outgoing);
+         return false;
+        }
+      entries++;
+      if(MathAbs(positions[i].incoming-positions[i].outgoing)>1e-8) continue;
+      if(!MathIsValidNumber(positions[i].net))
+        {
+         Print("GS20History FAIL: nonfinite net on id=",positions[i].id);
+         return false;
+        }
       closed++; net+=positions[i].net;
       if(positions[i].net>1e-8) wins++;
       else if(positions[i].net< -1e-8) losses++;

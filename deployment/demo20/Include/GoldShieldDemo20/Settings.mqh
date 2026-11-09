@@ -70,7 +70,7 @@ input int LossCooldownMinutes=60; // Durasi cooldown pasca-rugi dalam menit
 input bool UseAggressiveRunnerTrailing=true; // Trailing lebih ketat untuk sisa volume setelah TP 1
 input double PartialTrailingATR=0.7; // Jarak trailing runner pasca TP 1 dalam kelipatan ATR
 input bool RequireHTFSlopeAlignment=true; // Kemiringan EMA tren H1 wajib searah (bukan datar)
-input bool RequireRisingADX=true; // Momentum ADX wajib sedang menanjak saat ADX < 25 (hindari perlambatan)
+input bool RequireRisingADX=false; // Momentum ADX wajib sedang menanjak saat ADX < 25 (hindari perlambatan)
 input bool UseCandleBodyFilter=true; // Filter bobot badan candle M15 terhadap rentang total
 input double MinCandleBodyRatio=0.40; // Rasio badan minimal (0.40 = 40% dari high-low, tolak doji tipis)
 input bool UseRSIMomentumThreshold=true; // Filter deviasi momentum RSI menjauhi garis tengah 50

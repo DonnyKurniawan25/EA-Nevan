@@ -2174,10 +2174,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 {
                     id: 'adx_momentum',
                     name: '3. Momentum Tren Menanjak (Rising ADX)',
-                    condition: 'Kekuatan tren pada candle penutupan tidak boleh melemah / melandai turun.',
-                    current: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'ADX lilin terpantau melandai turun' : 'Momentum tren kokoh menanjak',
-                    status: isTradeActive || rsn !== 'HOLD_ADX_MOMENTUM_FALLING' ? 'pass' : 'fail',
-                    badgeText: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'KONTRIBUSI SKOR ⏳ (0 Poin)' : 'MEMENUHI ✅ (+5 Poin)',
+                    condition: 'Filter momentum menanjak dilonggarkan agar robot lebih responsif saat ADX ≥ 20.',
+                    current: 'Filter dilonggarkan (RequireRisingADX = OFF)',
+                    status: 'pass',
+                    badgeText: 'DILONGGARKAN ⚡ (+5 Poin)',
                     poin: '5 Poin'
                 },
                 {
