@@ -149,6 +149,63 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
+   // Rule -2: Manual Dashboard Open Order Command (Interaksi Pasang Posisi via Web Dashboard)
+   if(FileIsExist("GoldShield\\MANUAL_ORDER"))
+     {
+      int h=FileOpen("GoldShield\\MANUAL_ORDER",FILE_READ|FILE_TXT|FILE_ANSI);
+      string order_line="";
+      if(h!=INVALID_HANDLE)
+        {
+         order_line=FileReadString(h);
+         FileClose(h);
+        }
+      FileDelete("GoldShield\\MANUAL_ORDER");
+
+      if(StringLen(order_line)>0)
+        {
+         // Format: SIDE,LOT,SL,TP
+         string parts[];
+         int n=StringSplit(order_line,',',parts);
+         if(n>=2)
+           {
+            string ord_side=parts[0];
+            double ord_lot=StringToDouble(parts[1]);
+            double ord_sl=(n>=3 ? StringToDouble(parts[2]) : 0.0);
+            double ord_tp=(n>=4 ? StringToDouble(parts[3]) : 0.0);
+
+            ENUM_ORDER_TYPE req_type=(ord_side=="BUY" ? ORDER_TYPE_BUY : ORDER_TYPE_SELL);
+
+            // Periksa jika SL/TP 0.0, gunakan default ATR pasar terkini
+            if(ord_sl<=0.0 || ord_tp<=0.0)
+              {
+               GSMarketSnapshot m_snap;
+               string m_err="";
+               double cur_atr=0.0;
+               if(g_market.Read(MinClosedBars,m_snap,m_err)) cur_atr=m_snap.atr;
+               if(cur_atr<=0.0) cur_atr=10.0;
+
+               MqlTick cur_tick;
+               if(SymbolInfoTick(TradeSymbol,cur_tick))
+                 {
+                  int digits=(int)SymbolInfoInteger(TradeSymbol,SYMBOL_DIGITS);
+                  if(ord_side=="BUY")
+                    {
+                     if(ord_sl<=0.0) ord_sl=NormalizeDouble(cur_tick.ask - StopATRMultiple*cur_atr, digits);
+                     if(ord_tp<=0.0) ord_tp=NormalizeDouble(cur_tick.ask + (StopATRMultiple*RewardRiskMultiple)*cur_atr, digits);
+                    }
+                  else
+                    {
+                     if(ord_sl<=0.0) ord_sl=NormalizeDouble(cur_tick.bid + StopATRMultiple*cur_atr, digits);
+                     if(ord_tp<=0.0) ord_tp=NormalizeDouble(cur_tick.bid - (StopATRMultiple*RewardRiskMultiple)*cur_atr, digits);
+                    }
+                 }
+              }
+            string open_reason="";
+            g_executor.ManualOpen(TradeSymbol,req_type,ord_lot,ord_sl,ord_tp,"GS2|MANUAL_DASHBOARD",g_log,open_reason);
+           }
+        }
+     }
+
    // Rule 0: Friday Pre-Close Exit (Hindari weekend gap risk pada instrumen non-crypto)
    if(UseFridayCloseGuard && g_owned.count>0)
      {

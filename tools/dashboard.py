@@ -10,6 +10,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -25,6 +26,19 @@ DEFAULT_HOST = "0.0.0.0"
 PID_FILE = Path("/tmp/goldshield-dashboard.pid")
 DATA_DIR = Path("/home/ubuntu/.mt5/drive_c/Program Files/MetaTrader 5/MQL5/Files/GoldShield")
 AUTH_TOKEN = os.environ.get("DASHBOARD_TOKEN", "goldshield-demo")
+
+# Operator Trading PIN (Khusus Donny untuk Transaksi)
+TRADING_PIN_FILE = Path("/etc/goldshield/trading_pin.env")
+TRADING_PIN = "250892"
+if TRADING_PIN_FILE.exists():
+    try:
+        for _line in TRADING_PIN_FILE.read_text().splitlines():
+            if _line.strip().startswith("TRADING_PIN="):
+                TRADING_PIN = _line.strip().split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    except Exception:
+        pass
+TRADING_PIN = os.environ.get("TRADING_PIN", TRADING_PIN)
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="id">
@@ -780,6 +794,335 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin-top: 2px;
         }
 
+        /* PIN BADGE & MODAL */
+        .pin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .pin-badge.locked {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fde68a;
+        }
+        .pin-badge.unlocked {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #bbf7d0;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+        .modal-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 380px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            animation: modalFadeIn 0.2s ease;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            font-size: 1.05rem;
+            color: var(--navy);
+            margin: 0;
+        }
+        .btn-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .modal-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            margin: 0;
+        }
+        .pin-input-box {
+            display: flex;
+            justify-content: center;
+            margin: 8px 0;
+        }
+        .pin-input {
+            width: 100%;
+            text-align: center;
+            font-size: 1.6rem;
+            letter-spacing: 10px;
+            font-family: var(--mono);
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--navy);
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .pin-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        .pin-error-box {
+            color: var(--red);
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .btn-modal-cancel {
+            flex: 1;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: #f8fafc;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .btn-modal-submit {
+            flex: 1;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: var(--primary);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        /* TOGGLE RULES BUTTON */
+        .btn-toggle-rules {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 4px 10px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: var(--primary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-toggle-rules:hover {
+            background: #eff6ff;
+            border-color: var(--primary);
+        }
+
+        /* CARD TRADING MANUAL (MODE GABUT) */
+        .trade-exec-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            border-top: 4px solid var(--primary);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .trade-exec-header {
+            padding: 12px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .trade-exec-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .badge-operator {
+            font-size: 0.68rem;
+            font-weight: 700;
+            background: #eff6ff;
+            color: var(--primary);
+            padding: 2px 7px;
+            border-radius: 10px;
+            border: 1px solid #bfdbfe;
+        }
+        .trade-exec-body {
+            padding: 16px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .trade-form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-label {
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .lot-pills {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .pill-lot {
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: #f8fafc;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .pill-lot.active {
+            background: var(--navy);
+            color: #ffffff;
+            border-color: var(--navy);
+        }
+        .lot-input {
+            width: 70px;
+            padding: 5px 8px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        .auto-protect-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .auto-protect-box input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        .auto-protect-text {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .trade-custom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: #fffdf5;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            border: 1px dashed #fde68a;
+        }
+        .trade-custom-row input {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: var(--mono);
+            font-size: 0.82rem;
+        }
+        .trade-buttons-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 4px;
+        }
+        .btn-trade {
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .btn-trade:active {
+            transform: scale(0.98);
+        }
+        .btn-trade-buy {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .btn-trade-buy:hover {
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+        }
+        .btn-trade-sell {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        .btn-trade-sell:hover {
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+        }
+        .btn-trade-main {
+            font-size: 0.98rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-trade-sub {
+            font-size: 0.72rem;
+            opacity: 0.92;
+            font-weight: 500;
+        }
+
+        /* MOBILE BOTTOM STICKY NAV */
+        .mobile-bottom-nav {
+            display: none;
+        }
+
         /* FOOTER */
         footer {
             margin-top: 24px;
@@ -791,7 +1134,50 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         /* MOBILE OPTIMIZATIONS (< 768px) */
         @media (max-width: 768px) {
-            body { padding: 10px; }
+            body { padding: 8px 8px 75px 8px; }
+            .mobile-bottom-nav {
+                display: flex;
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                background: #ffffff;
+                border-top: 1px solid var(--border);
+                box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+                z-index: 8000;
+                justify-content: space-around;
+                padding: 6px 4px 8px 4px;
+            }
+            .mob-nav-btn {
+                background: none;
+                border: none;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+                font-size: 0.68rem;
+                font-weight: 600;
+                color: var(--text-muted);
+                cursor: pointer;
+                flex: 1;
+                padding: 4px;
+            }
+            .mob-nav-btn.active {
+                color: var(--primary);
+            }
+            .mob-nav-btn span:first-child {
+                font-size: 1.1rem;
+            }
+            .trade-buttons-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .btn-trade {
+                padding: 12px;
+            }
+            .trade-form-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
             header {
                 padding: 14px 16px;
                 border-radius: var(--radius-md);
@@ -825,7 +1211,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 font-size: 0.72rem;
             }
             .chart-frame-wrapper {
-                height: 380px;
+                height: 320px;
             }
             .chart-header {
                 padding: 10px 14px;
@@ -867,6 +1253,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </style>
 </head>
 <body>
+    <!-- MODAL KEAMANAN PIN OPERATOR TRADING (DONNY) -->
+    <div class="modal-overlay" id="pin-modal" style="display:none;" onclick="if(event.target===this) togglePinModal(false)">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>🔐 Akses Transaksi Manual</h3>
+                <button type="button" class="btn-modal-close" onclick="togglePinModal(false)">✕</button>
+            </div>
+            <p class="modal-desc">
+                Masukkan PIN Trading 6-digit untuk mengaktifkan fitur pasang posisi dan tutup posisi manual di server MT5.
+            </p>
+            <div class="pin-input-box">
+                <input type="password" id="input-pin" class="pin-input" maxlength="6" inputmode="numeric" placeholder="••••••" onkeyup="if(event.key==='Enter') submitPin()">
+            </div>
+            <div class="pin-error-box" id="pin-error-msg" style="display:none;"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-modal-cancel" onclick="togglePinModal(false)">Batal</button>
+                <button type="button" class="btn-modal-submit" id="btn-submit-pin" onclick="submitPin()">Verifikasi PIN</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- HEADER -->
         <header>
@@ -877,7 +1284,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <p>Pemantauan Real-Time Akun Demo Exness MT5 • Port 8089</p>
                 </div>
             </div>
-            <div class="header-meta">
+            <div class="header-meta" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="pin-badge locked" id="btn-pin-badge" onclick="togglePinModal()" title="Klik untuk membuka / mengunci akses transaksi">
+                    <span id="pin-badge-icon">🔒</span>
+                    <span id="pin-badge-text">Mode Tamu (Terkunci)</span>
+                </button>
                 <div class="status-badge">
                     <div class="pulse-dot"></div>
                     <span id="header-status">TERHUBUNG • M15 WAIT</span>
@@ -935,18 +1346,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- CHECKLIST EVALUASI SEMUA ATURAN & FILTER TRADING -->
+        <!-- CHECKLIST EVALUASI SEMUA ATURAN & FILTER TRADING (COLLAPSIBLE) -->
         <div class="rules-card" id="rules-card">
-            <div class="rules-header">
+            <div class="rules-header" onclick="toggleRules()" style="cursor:pointer;" title="Klik untuk menampilkan / menyembunyikan rincian 15 rules">
                 <div class="rules-title">
                     <span>📋</span>
-                    <span>Evaluasi Semua Aturan & Syarat Trading (15 Rules)</span>
+                    <span>15 Aturan & Syarat Trading Robot</span>
                 </div>
-                <div class="rules-summary-badge" id="rules-summary-badge">
-                    Memuat Evaluasi...
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <div class="rules-summary-badge" id="rules-summary-badge">
+                        Memuat Evaluasi...
+                    </div>
+                    <button type="button" class="btn-toggle-rules" id="btn-toggle-rules">👁️ Tampilkan (15)</button>
                 </div>
             </div>
-            <div class="rules-grid" id="rules-grid">
+            <div class="rules-grid" id="rules-grid" style="display:none;">
                 <!-- Diisi otomatis oleh JavaScript -->
             </div>
         </div>
@@ -1022,6 +1436,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         allowtransparency="true"
                         scrolling="no">
                 </iframe>
+            </div>
+        </div>
+
+        <!-- CARD TRADING MANUAL (MODE GABUT / TRANSAKSI SENDIRI) -->
+        <div class="trade-exec-card" id="trade-exec-card">
+            <div class="trade-exec-header">
+                <div class="trade-exec-title">
+                    <span>⚡</span>
+                    <span>Pasang Posisi Cepat (Mode Trading Mandiri)</span>
+                    <span class="badge-operator">DONNY ONLY</span>
+                </div>
+                <div id="trade-auth-status" style="font-size:0.75rem; color:var(--text-muted);">
+                    🔒 Terproteksi PIN
+                </div>
+            </div>
+            <div class="trade-exec-body">
+                <div class="trade-form-row">
+                    <div class="form-group">
+                        <span class="form-label">Pilih Ukuran Lot</span>
+                        <div class="lot-pills">
+                            <button type="button" class="pill-lot active" onclick="setTradeLot(0.01, this)">0.01</button>
+                            <button type="button" class="pill-lot" onclick="setTradeLot(0.02, this)">0.02</button>
+                            <button type="button" class="pill-lot" onclick="setTradeLot(0.05, this)">0.05</button>
+                            <input type="number" id="trade-lot-input" class="lot-input" value="0.01" step="0.01" min="0.01" max="0.05" onchange="onCustomLotChange(this.value)">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <span class="form-label">Manajemen Risiko Robot</span>
+                        <div class="auto-protect-box">
+                            <input type="checkbox" id="trade-auto-protect" checked onchange="toggleAutoProtect(this.checked)">
+                            <label for="trade-auto-protect" class="auto-protect-text">Proteksi Otomatis (SL 2.0 ATR & Fast Profit Lock)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trade-custom-row" id="trade-custom-inputs" style="display:none;">
+                    <div>
+                        <span class="form-label">Manual Stop Loss (0 = default ATR)</span>
+                        <input type="number" id="trade-custom-sl" step="0.01" placeholder="Otomatis ATR">
+                    </div>
+                    <div>
+                        <span class="form-label">Manual Take Profit (0 = default ATR)</span>
+                        <input type="number" id="trade-custom-tp" step="0.01" placeholder="Otomatis ATR">
+                    </div>
+                </div>
+
+                <div class="trade-buttons-row">
+                    <button type="button" class="btn-trade btn-trade-buy" onclick="clickManualOrder('BUY')">
+                        <span class="btn-trade-main">🟢 PASANG BUY (LONG)</span>
+                        <span class="btn-trade-sub" id="btn-buy-sub">Beli Sekarang @ Pasar • SL/TP Terproteksi</span>
+                    </button>
+                    <button type="button" class="btn-trade btn-trade-sell" onclick="clickManualOrder('SELL')">
+                        <span class="btn-trade-main">🔴 PASANG SELL (SHORT)</span>
+                        <span class="btn-trade-sub" id="btn-sell-sub">Jual Sekarang @ Pasar • SL/TP Terproteksi</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1156,15 +1626,246 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <!-- FOOTER -->
         <footer>
-            <p>GoldShield AI EA V2 • Mode: Read-Only Standby • Port 8089 • Auto-Refresh tiap 3 detik</p>
-            <p style="margin-top:4px; color:var(--text-subtle);">Dashboard ini murni bersifat pemantauan tanpa akses transaksi.</p>
+            <p>GoldShield AI EA V2 • Mode: Live Interactive MT5 • Port 8089 • Auto-Refresh tiap 3 detik</p>
+            <p style="margin-top:4px; color:var(--text-subtle);">Dashboard dilengkapi autentikasi PIN Trading operator untuk pasang & tutup posisi mandiri.</p>
         </footer>
+    </div>
+
+    <!-- MOBILE BOTTOM STICKY NAVIGATION (< 768px) -->
+    <div class="mobile-bottom-nav">
+        <button type="button" class="mob-nav-btn active" id="mob-nav-chart" onclick="scrollToElement('tv-chart-frame'); activateMobNav(this)">
+            <span>📈</span>
+            <span>Grafik</span>
+        </button>
+        <button type="button" class="mob-nav-btn" id="mob-nav-trade" onclick="scrollToElement('trade-exec-card'); activateMobNav(this)">
+            <span>⚡</span>
+            <span>Trade</span>
+        </button>
+        <button type="button" class="mob-nav-btn" id="mob-nav-pos" onclick="switchTab('positions'); scrollToElement('tab-positions'); activateMobNav(this)">
+            <span>📋</span>
+            <span>Posisi (<span id="mob-count-pos">0</span>)</span>
+        </button>
+        <button type="button" class="mob-nav-btn" id="mob-nav-deals" onclick="switchTab('deals'); scrollToElement('tab-deals'); activateMobNav(this)">
+            <span>📜</span>
+            <span>Riwayat</span>
+        </button>
     </div>
 
     <script>
         let currentTab = 'positions';
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token') || 'goldshield-demo';
+
+        // Operator PIN State & Management
+        let operatorPin = sessionStorage.getItem('goldshield_trading_pin') || '';
+        let isPinVerified = false;
+        let pendingAction = null;
+
+        function updatePinUi() {
+            const badge = document.getElementById('btn-pin-badge');
+            const icon = document.getElementById('pin-badge-icon');
+            const text = document.getElementById('pin-badge-text');
+            const authStatus = document.getElementById('trade-auth-status');
+
+            if (isPinVerified) {
+                if (badge) {
+                    badge.className = 'pin-badge unlocked';
+                    if (icon) icon.textContent = '🔓';
+                    if (text) text.textContent = 'Donny (Akses Aktif)';
+                }
+                if (authStatus) {
+                    authStatus.innerHTML = '<span style="color:#16a34a; font-weight:700;">🟢 Akses Aktif (Siap Transaksi)</span>';
+                }
+            } else {
+                if (badge) {
+                    badge.className = 'pin-badge locked';
+                    if (icon) icon.textContent = '🔒';
+                    if (text) text.textContent = 'Mode Tamu (Terkunci)';
+                }
+                if (authStatus) {
+                    authStatus.innerHTML = '<span style="color:#92400e; font-weight:600;">🔒 Terproteksi PIN</span>';
+                }
+            }
+        }
+
+        function togglePinModal(show = true) {
+            const modal = document.getElementById('pin-modal');
+            const pinInput = document.getElementById('input-pin');
+            const errBox = document.getElementById('pin-error-msg');
+            if (!modal) return;
+            if (show) {
+                modal.style.display = 'flex';
+                if (errBox) errBox.style.display = 'none';
+                if (pinInput) {
+                    pinInput.value = '';
+                    setTimeout(() => pinInput.focus(), 150);
+                }
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        function ensurePinAccess(onSuccess) {
+            if (isPinVerified && operatorPin) {
+                onSuccess(operatorPin);
+                return;
+            }
+            pendingAction = onSuccess;
+            togglePinModal(true);
+        }
+
+        function submitPin() {
+            const pinInput = document.getElementById('input-pin');
+            const pin = (pinInput ? pinInput.value : '').trim();
+            const errBox = document.getElementById('pin-error-msg');
+            const curToken = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
+
+            if (!pin || pin.length < 4) {
+                if (errBox) {
+                    errBox.textContent = 'Masukkan minimal 4-6 digit PIN.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            fetch(`/api/verify_pin?token=${curToken}&pin=${encodeURIComponent(pin)}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        operatorPin = pin;
+                        sessionStorage.setItem('goldshield_trading_pin', pin);
+                        isPinVerified = true;
+                        updatePinUi();
+                        togglePinModal(false);
+                        if (pendingAction) {
+                            const act = pendingAction;
+                            pendingAction = null;
+                            act(pin);
+                        }
+                    } else {
+                        if (errBox) {
+                            errBox.textContent = res.error || 'PIN Keamanan Salah. Silakan coba lagi.';
+                            errBox.style.display = 'block';
+                        }
+                    }
+                })
+                .catch(err => {
+                    if (errBox) {
+                        errBox.textContent = 'Koneksi error: ' + err.message;
+                        errBox.style.display = 'block';
+                    }
+                });
+        }
+
+        // Auto verify cached PIN on page load
+        if (operatorPin) {
+            fetch(`/api/verify_pin?token=${token}&pin=${encodeURIComponent(operatorPin)}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        isPinVerified = true;
+                        updatePinUi();
+                    } else {
+                        sessionStorage.removeItem('goldshield_trading_pin');
+                        operatorPin = '';
+                        isPinVerified = false;
+                        updatePinUi();
+                    }
+                }).catch(() => {});
+        }
+
+        // Rules Collapsible Toggle
+        let rulesExpanded = false;
+        function toggleRules() {
+            rulesExpanded = !rulesExpanded;
+            const grid = document.getElementById('rules-grid');
+            const btn = document.getElementById('btn-toggle-rules');
+            if (grid) {
+                grid.style.display = rulesExpanded ? 'grid' : 'none';
+            }
+            if (btn) {
+                btn.innerHTML = rulesExpanded ? '🙈 Sembunyikan' : '👁️ Tampilkan (15)';
+            }
+        }
+
+        // Manual Trading Form Helpers
+        let selectedTradeLot = 0.01;
+
+        function setTradeLot(lot, btn) {
+            selectedTradeLot = lot;
+            const input = document.getElementById('trade-lot-input');
+            if (input) input.value = lot.toFixed(2);
+            document.querySelectorAll('.pill-lot').forEach(p => p.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+        }
+
+        function onCustomLotChange(val) {
+            let num = parseFloat(val);
+            if (isNaN(num) || num <= 0) num = 0.01;
+            if (num > 0.05) num = 0.05;
+            selectedTradeLot = num;
+            document.querySelectorAll('.pill-lot').forEach(p => {
+                if (parseFloat(p.textContent) === num) p.classList.add('active');
+                else p.classList.remove('active');
+            });
+        }
+
+        function toggleAutoProtect(checked) {
+            const customRow = document.getElementById('trade-custom-inputs');
+            if (customRow) {
+                customRow.style.display = checked ? 'none' : 'grid';
+            }
+        }
+
+        function clickManualOrder(side) {
+            ensurePinAccess(pin => {
+                const lot = selectedTradeLot;
+                const autoProtect = document.getElementById('trade-auto-protect') ? document.getElementById('trade-auto-protect').checked : true;
+                let sl = 0.0;
+                let tp = 0.0;
+                if (!autoProtect) {
+                    sl = parseFloat(document.getElementById('trade-custom-sl').value) || 0.0;
+                    tp = parseFloat(document.getElementById('trade-custom-tp').value) || 0.0;
+                }
+
+                const sideLabel = side === 'BUY' ? 'Beli (Long)' : 'Jual (Short)';
+                const confirmMsg = `Konfirmasi Pasang Posisi:\n` +
+                    `• Transaksi: ${side} (${sideLabel})\n` +
+                    `• Ukuran Lot: ${lot.toFixed(2)} Lot\n` +
+                    `• Pengaman: ${autoProtect ? 'Otomatis Robot (SL 2.0 ATR, TP 2.5 ATR, Fast Profit Lock)' : 'Custom SL/TP'}\n\n` +
+                    `Kirim order sekarang ke robot MT5?`;
+
+                if (!confirm(confirmMsg)) return;
+
+                const curToken = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
+                fetch(`/api/order?token=${curToken}&pin=${encodeURIComponent(pin)}&type=${side}&lot=${lot}&sl=${sl}&tp=${tp}`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) {
+                            alert(`✅ ${res.message}\nRobot sedang mengeksekusi order ${side}.`);
+                            fetchData();
+                        } else {
+                            alert(`❌ Gagal pasang posisi: ${res.error || 'Terjadi kesalahan sistem'}`);
+                        }
+                    })
+                    .catch(err => {
+                        alert(`❌ Terjadi kendala koneksi: ${err.message}`);
+                    });
+            });
+        }
+
+        // Mobile Nav Helpers
+        function scrollToElement(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function activateMobNav(btn) {
+            document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+        }
 
         function switchTab(tabName) {
             currentTab = tabName;
@@ -1648,6 +2349,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // Counts
             document.getElementById('count-positions').textContent = pos.length;
+            const mobPos = document.getElementById('mob-count-pos');
+            if (mobPos) mobPos.textContent = pos.length;
             document.getElementById('count-deals').textContent = (data.deals || []).length;
             document.getElementById('count-audit').textContent = (data.audit || []).length;
 
@@ -1880,27 +2583,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function closeTrade(ticket) {
-            const isAll = ticket === 'all' || ticket === '0';
-            const label = isAll ? 'SEMUA posisi aktif' : `posisi tiket #${ticket}`;
-            if (!confirm(`Konfirmasi Tutup Posisi:\nApakah Anda yakin ingin menutup ${label} sekarang?\n\nPerintah akan langsung dikirim ke MetaTrader 5 dan posisi akan ditutup di harga pasar.`)) {
-                return;
-            }
-            const token = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
-            const targetTicket = isAll ? '0' : ticket;
+            ensurePinAccess(pin => {
+                const isAll = ticket === 'all' || ticket === '0';
+                const label = isAll ? 'SEMUA posisi aktif' : `posisi tiket #${ticket}`;
+                if (!confirm(`Konfirmasi Tutup Posisi:\nApakah Anda yakin ingin menutup ${label} sekarang?\n\nPerintah akan langsung dikirim ke MetaTrader 5 dan posisi akan ditutup di harga pasar.`)) {
+                    return;
+                }
+                const curToken = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
+                const targetTicket = isAll ? '0' : ticket;
 
-            fetch(`/api/close?ticket=${targetTicket}&token=${token}`, { method: 'POST' })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.success) {
-                        alert(`✅ ${res.message}\nRobot sedang mengeksekusi penutupan.`);
-                        fetchData();
-                    } else {
-                        alert(`❌ Gagal menutup posisi: ${res.error || 'Terjadi kesalahan sistem'}`);
-                    }
-                })
-                .catch(err => {
-                    alert(`❌ Terjadi kendala koneksi: ${err.message}`);
-                });
+                fetch(`/api/close?ticket=${targetTicket}&token=${curToken}&pin=${encodeURIComponent(pin)}`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) {
+                            alert(`✅ ${res.message}\nRobot sedang mengeksekusi penutupan.`);
+                            fetchData();
+                        } else {
+                            alert(`❌ Gagal menutup posisi: ${res.error || 'Terjadi kesalahan sistem'}`);
+                        }
+                    })
+                    .catch(err => {
+                        alert(`❌ Terjadi kendala koneksi: ${err.message}`);
+                    });
+            });
         }
 
         fetchData();
@@ -2165,13 +2870,104 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
+        # PIN Verification Endpoint (Khusus Operator / Donny)
+        if parsed.path == "/api/verify_pin":
+            query = parse_qs(parsed.query)
+            pin = query.get("pin", [""])[0].strip()
+            if pin == TRADING_PIN:
+                resp = {"success": True, "message": "PIN Terverifikasi. Akses Transaksi Aktif."}
+            else:
+                resp = {"success": False, "error": "PIN Keamanan Salah. Akses Ditolak."}
+            payload = json.dumps(resp).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
+        # Manual Order Open Position Endpoint (Interaksi Pasang Posisi via Dashboard)
+        if parsed.path in ("/api/order", "/api/open_position"):
+            query = parse_qs(parsed.query)
+            pin = query.get("pin", [""])[0].strip()
+            if not pin or pin != TRADING_PIN:
+                resp = {"success": False, "error": "PIN Keamanan Transaksi salah atau belum dimasukkan. Khusus akun operator (Donny)."}
+                payload = json.dumps(resp).encode("utf-8")
+                self.send_response(HTTPStatus.FORBIDDEN)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
+            side = query.get("type", ["BUY"])[0].strip().upper()
+            if side not in ("BUY", "SELL"):
+                side = "BUY"
+            lot_str = query.get("lot", ["0.01"])[0].strip()
+            try:
+                lot = float(lot_str)
+                if lot <= 0.0: lot = 0.01
+                if lot > 0.05: lot = 0.05
+            except ValueError:
+                lot = 0.01
+
+            sl_str = query.get("sl", ["0.0"])[0].strip()
+            tp_str = query.get("tp", ["0.0"])[0].strip()
+            try:
+                sl = float(sl_str)
+            except ValueError:
+                sl = 0.0
+            try:
+                tp = float(tp_str)
+            except ValueError:
+                tp = 0.0
+
+            cmd_file = DATA_DIR / "MANUAL_ORDER"
+            try:
+                cmd_file.write_text(f"{side},{lot:.2f},{sl:.5f},{tp:.5f}\n")
+                try:
+                    os.chmod(cmd_file, 0o666)
+                    shutil.chown(cmd_file, user="ubuntu", group="ubuntu")
+                except Exception:
+                    pass
+                msg = f"Perintah pasang posisi {side} {lot:.2f} lot berhasil dikirim ke robot MT5."
+                resp = {"success": True, "message": msg, "side": side, "lot": lot, "sl": sl, "tp": tp}
+            except Exception as e:
+                resp = {"success": False, "error": str(e)}
+
+            payload = json.dumps(resp).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         # Manual Close Position endpoint (Interaksi Tutup Posisi via Dashboard)
         if parsed.path in ("/api/close", "/api/close_position"):
             query = parse_qs(parsed.query)
+            pin = query.get("pin", [""])[0].strip()
+            if not pin or pin != TRADING_PIN:
+                resp = {"success": False, "error": "PIN Keamanan Transaksi salah atau belum dimasukkan. Khusus akun operator (Donny)."}
+                payload = json.dumps(resp).encode("utf-8")
+                self.send_response(HTTPStatus.FORBIDDEN)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
             ticket = query.get("ticket", ["0"])[0].strip()
             cmd_file = DATA_DIR / "MANUAL_CLOSE"
             try:
                 cmd_file.write_text(ticket + "\n")
+                try:
+                    os.chmod(cmd_file, 0o666)
+                    shutil.chown(cmd_file, user="ubuntu", group="ubuntu")
+                except Exception:
+                    pass
                 if ticket in ("0", "all", ""):
                     msg = "Perintah tutup SEMUA posisi berhasil dikirim ke robot MT5."
                 else:
