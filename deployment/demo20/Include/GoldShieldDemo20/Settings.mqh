@@ -124,7 +124,7 @@ input bool UseSpreadATRFilter=true; // Filter pelebaran spread dinamis terhadap 
 input double MaxSpreadATRMultiple=0.30; // Toleransi spread maksimal (% dari ATR M15, 0.30 = 30%)
 input double MaxDailyLossPct=0.5; // Account realized trading P/L, measured against persisted reference.
 input double MaxWeeklyLossPct=1.0;
-input int MaxConsecutiveLossesPerDay=2; // Owned, fully closed positions after all costs.
+input int MaxConsecutiveLossesPerDay=10; // Owned, fully closed positions after all costs.
 input int MaxEntriesPerDay=20; // Unique owned positions; partial fills count once.
 input bool UseDynamicDailyQuota=true; // Kuota dinamis: terus jika untung/impas, batasi ketat jika rugi
 input int MaxDynamicEntriesPerDay=20; // Batas absolut entri per hari saat mode kuota dinamis
