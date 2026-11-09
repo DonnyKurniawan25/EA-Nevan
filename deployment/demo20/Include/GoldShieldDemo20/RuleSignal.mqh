@@ -109,7 +109,126 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
       return GS_HOLD;
      }
 
-   // Filter RSI momentum: hindari sinyal ragu-ragu di sekitar garis 50 (dikecualikan untuk pullback karena titik pantul alami)
+   // 1. HARD SAFETY GATES (Pelindung Modal Mutlak - Tidak Boleh Dilanggar)
+   // Filter anti-chasing: tolak entry jika harga sudah lonjak terlalu jauh dari EMA (pucuk/lembah)
+   if(GSPositive(MaxEntryStretchATR) && GSPositive(data.atr))
+     {
+      double max_stretch=data.atr*MaxEntryStretchATR;
+      if(MathAbs(data.bar.close-data.fast_ema)>max_stretch)
+        { reason="HOLD_PRICE_OVEREXTENDED"; return GS_HOLD; }
+     }
+
+   // Filter anti-climax volume: tolak jika volume meledak liar > 3x (stop-hunt institusi)
+   if(UseTickVolumeFilter && MaxTickVolumeRatio>0.0 && data.avg_tick_volume>0.0 &&
+      (double)data.bar.tick_volume>data.avg_tick_volume*MaxTickVolumeRatio)
+     {
+      reason="HOLD_VOLUME_CLIMAX";
+      return GS_HOLD;
+     }
+
+   // Filter arah besar H1: arah order wajib selaras dengan tren H1 (jangan lawan arus institusi)
+   if(UseHTFTrendFilter)
+     {
+      if(!GSPositive(data.trend_close) || !GSPositive(data.trend_fast_ema) || !GSPositive(data.trend_slow_ema))
+        { reason="HOLD_HTF_DATA_INVALID"; return GS_HOLD; }
+      if(side==1 && (data.trend_close<data.trend_slow_ema || data.trend_fast_ema<data.trend_slow_ema))
+        { reason="HOLD_HTF_TREND_BEARISH"; return GS_HOLD; }
+      else if(side==-1 && (data.trend_close>data.trend_slow_ema || data.trend_fast_ema>data.trend_slow_ema))
+        { reason="HOLD_HTF_TREND_BULLISH"; return GS_HOLD; }
+     }
+
+   // 2. CONFLUENCE SCORING SYSTEM (Sistem Pembobotan Multi-Aturan Fleksibel)
+   if(UseConfluenceScoring)
+     {
+      int conf_score=0;
+
+      // Pilar 1: Keselarasan Tren & Kemiringan Slope H1 (Maks 30 poin)
+      if(UseHTFTrendFilter)
+        {
+         if((side==1 && data.trend_close>data.trend_slow_ema && data.trend_fast_ema>data.trend_slow_ema) ||
+            (side==-1 && data.trend_close<data.trend_slow_ema && data.trend_fast_ema<data.trend_slow_ema))
+            conf_score+=20;
+         if(RequireHTFSlopeAlignment && GSPositive(data.previous_trend_fast_ema))
+           {
+            if((side==1 && data.trend_fast_ema>data.previous_trend_fast_ema) ||
+               (side==-1 && data.trend_fast_ema<data.previous_trend_fast_ema))
+               conf_score+=10;
+           }
+         else
+            conf_score+=10;
+        }
+
+      // Pilar 2: Struktur EMA M15 & Model Setup (Maks 25 poin)
+      if((side==1 && data.fast_ema>data.slow_ema) || (side==-1 && data.fast_ema<data.slow_ema))
+         conf_score+=10;
+      if(candidate_setup=="SETUP_PULLBACK")
+         conf_score+=15;
+      else if(candidate_setup=="SETUP_BREAKOUT")
+         conf_score+=15;
+      else
+         conf_score+=10;
+
+      // Pilar 3: Kekuatan Tren ADX (Maks 20 poin)
+      if(UseADXFilter)
+        {
+         if(data.adx>=25.0) conf_score+=15;
+         else if(data.adx>=ADXThreshold) conf_score+=10;
+         if(RequireRisingADX && GSPositive(data.previous_adx) && data.adx>=data.previous_adx)
+            conf_score+=5;
+         else if(!RequireRisingADX)
+            conf_score+=5;
+        }
+
+      // Pilar 4: Karakteristik Lilin M15 (Maks 20 poin)
+      double crange=data.bar.high-data.bar.low;
+      if((side==1 && data.bar.close>data.bar.open) || (side==-1 && data.bar.close<data.bar.open))
+         conf_score+=10;
+      if(crange>0.0 && MathAbs(data.bar.close-data.bar.open)/crange>=MinCandleBodyRatio)
+         conf_score+=5;
+      if(crange>0.0)
+        {
+         if(side==1 && (data.bar.close-data.bar.low)/crange>=MinCandleClosePercent/100.0)
+            conf_score+=5;
+         else if(side==-1 && (data.bar.high-data.bar.close)/crange>=MinCandleClosePercent/100.0)
+            conf_score+=5;
+        }
+
+      // Pilar 5: Volume Transaksi Tick (Maks 15 poin)
+      if(UseTickVolumeFilter && data.avg_tick_volume>0.0)
+        {
+         if((double)data.bar.tick_volume>=data.avg_tick_volume*1.0) conf_score+=15;
+         else if((double)data.bar.tick_volume>=data.avg_tick_volume*MinTickVolumeRatio) conf_score+=10;
+         else if((double)data.bar.tick_volume>=data.avg_tick_volume*0.50) conf_score+=5;
+        }
+      else
+         conf_score+=15;
+
+      // Pilar 6: Momentum RSI (Maks 10 poin)
+      if(UseRSIMomentumThreshold)
+        {
+         if((side==1 && data.rsi>=50.0+RSIMomentumThreshold) ||
+            (side==-1 && data.rsi<=50.0-RSIMomentumThreshold))
+            conf_score+=10;
+         else if(candidate_setup=="SETUP_PULLBACK")
+            conf_score+=5;
+        }
+      else
+         conf_score+=10;
+
+      // Evaluasi Ambang Kelulusan Skor Konfluensi
+      if(conf_score>=MinConfluenceScore)
+        {
+         reason=StringFormat("CANDIDATE_%s_CONF%d",candidate_setup,conf_score);
+         return (GSSide)side;
+        }
+      else
+        {
+         reason=StringFormat("HOLD_CONFLUENCE_SCORE_LOW_%d_MIN%d",conf_score,MinConfluenceScore);
+         return GS_HOLD;
+        }
+     }
+
+   // 3. LEGACY STRICT GATES (Digunakan hanya jika UseConfluenceScoring dimatikan)
    if(UseRSIMomentumThreshold && RSIMomentumThreshold>0.0 && candidate_setup!="SETUP_PULLBACK")
      {
       if(side==1 && data.rsi<50.0+RSIMomentumThreshold)
@@ -118,7 +237,6 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_RSI_MOMENTUM_WEAK"; return GS_HOLD; }
      }
 
-   // Filter anti-whipsaw: penembusan EMA wajib punya buffer memadai (khusus crossover)
    if(EMAPenetrationBufferATR>0.0 && GSPositive(data.atr) && candidate_setup=="SETUP_CROSSOVER")
      {
       double pen_buf=data.atr*EMAPenetrationBufferATR;
@@ -126,14 +244,6 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_EMA_PENETRATION_INSUFFICIENT"; return GS_HOLD; }
       else if(side==-1 && data.bar.close>data.fast_ema-pen_buf)
         { reason="HOLD_EMA_PENETRATION_INSUFFICIENT"; return GS_HOLD; }
-     }
-
-   // Filter anti-chasing: tolak entry jika harga sudah lonjak terlalu jauh dari EMA (pucuk/lembah)
-   if(GSPositive(MaxEntryStretchATR) && GSPositive(data.atr))
-     {
-      double max_stretch=data.atr*MaxEntryStretchATR;
-      if(MathAbs(data.bar.close-data.fast_ema)>max_stretch)
-        { reason="HOLD_PRICE_OVEREXTENDED"; return GS_HOLD; }
      }
 
    if(RequireFreshCross && candidate_setup=="SETUP_CROSSOVER")
@@ -148,28 +258,20 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_NO_FRESH_TRIGGER"; return GS_HOLD; }
      }
 
-   // Prioritas 2: Multi-Timeframe Trend Filter (M15 + H1 EMA) & Slope Alignment
    if(UseHTFTrendFilter)
      {
-      if(!GSPositive(data.trend_close) || !GSPositive(data.trend_fast_ema) || !GSPositive(data.trend_slow_ema))
-        { reason="HOLD_HTF_DATA_INVALID"; return GS_HOLD; }
       if(side==1)
         {
-         if(data.trend_close<data.trend_slow_ema || data.trend_fast_ema<data.trend_slow_ema)
-           { reason="HOLD_HTF_TREND_BEARISH"; return GS_HOLD; }
          if(RequireHTFSlopeAlignment && GSPositive(data.previous_trend_fast_ema) && data.trend_fast_ema<=data.previous_trend_fast_ema)
            { reason="HOLD_HTF_SLOPE_FLAT_OR_FALLING"; return GS_HOLD; }
         }
       else if(side==-1)
         {
-         if(data.trend_close>data.trend_slow_ema || data.trend_fast_ema>data.trend_slow_ema)
-           { reason="HOLD_HTF_TREND_BULLISH"; return GS_HOLD; }
          if(RequireHTFSlopeAlignment && GSPositive(data.previous_trend_fast_ema) && data.trend_fast_ema>=data.previous_trend_fast_ema)
            { reason="HOLD_HTF_SLOPE_FLAT_OR_RISING"; return GS_HOLD; }
         }
      }
 
-   // Paket C: Filter arah & momentum candle M15
    if(UseCandleDirectionFilter)
      {
       double range=data.bar.high-data.bar.low;
@@ -187,7 +289,6 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
          if(range>0.0 && (data.bar.high-data.bar.close)/range<MinCandleClosePercent/100.0)
            { reason="HOLD_CANDLE_LOWER_WICK_REJECTION"; return GS_HOLD; }
         }
-      // Filter bobot badan candle M15: hindari doji / lilin banci di ADX rendah
       if(UseCandleBodyFilter && MinCandleBodyRatio>0.0 && range>0.0)
         {
          double body=MathAbs(data.bar.close-data.bar.open);
@@ -196,46 +297,18 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         }
      }
 
-   // Paket C: Filter volume transaksi (menghindari candle sepi / tipuan spread)
    if(UseTickVolumeFilter)
      {
       if(data.avg_tick_volume>0.0 && (double)data.bar.tick_volume<data.avg_tick_volume*MinTickVolumeRatio)
         { reason="HOLD_LOW_TICK_VOLUME"; return GS_HOLD; }
-      if(MaxTickVolumeRatio>0.0 && data.avg_tick_volume>0.0 && (double)data.bar.tick_volume>data.avg_tick_volume*MaxTickVolumeRatio)
-        { reason="HOLD_VOLUME_CLIMAX"; return GS_HOLD; }
      }
-
-   if(SignalModel==GS_TREND_PULLBACK)
-     {
-      if(!GSTrendPullbackOK(side,data.bar.open,data.bar.close,data.previous.high,data.previous.low,
-                           data.previous_fast_ema,data.fast_ema,data.slow_ema,data.previous_slow_ema,
-                           data.trend_close,data.trend_fast_ema,data.trend_slow_ema,data.atr,MaxEntryStretchATR))
-        { reason="HOLD_TREND_PULLBACK_NOT_CONFIRMED"; return GS_HOLD; }
-      reason="CANDIDATE_CONFIRMED_TREND_PULLBACK";
-      return (GSSide)side;
-     }
-
-   // Skor Konfluensi
-   int conf_score=0;
-   if(side==1 && data.trend_close>data.trend_slow_ema && data.trend_fast_ema>data.trend_slow_ema) conf_score+=30;
-   else if(side==-1 && data.trend_close<data.trend_slow_ema && data.trend_fast_ema<data.trend_slow_ema) conf_score+=30;
-   if(side==1 && data.fast_ema>data.slow_ema) conf_score+=20;
-   else if(side==-1 && data.fast_ema<data.slow_ema) conf_score+=20;
-   if(data.adx>=20.0)
-     {
-      conf_score+=15;
-      if(data.adx>data.previous_adx) conf_score+=5;
-     }
-   double crange=data.bar.high-data.bar.low;
-   if(crange>0.0 && MathAbs(data.bar.close-data.bar.open)/crange>=0.50) conf_score+=15;
-   if(data.avg_tick_volume>0.0 && (double)data.bar.tick_volume>=data.avg_tick_volume*1.0) conf_score+=15;
 
    if(candidate_setup=="SETUP_PULLBACK")
-      reason=StringFormat("CANDIDATE_PULLBACK_CONF%d",conf_score);
+      reason="CANDIDATE_PULLBACK";
    else if(candidate_setup=="SETUP_BREAKOUT")
-      reason=StringFormat("CANDIDATE_BREAKOUT_CONF%d",conf_score);
+      reason="CANDIDATE_BREAKOUT";
    else
-      reason=StringFormat("CANDIDATE_CROSSOVER_CONF%d",conf_score);
+      reason="CANDIDATE_CROSSOVER";
 
    return (GSSide)side;
   }

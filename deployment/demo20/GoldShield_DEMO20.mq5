@@ -303,9 +303,18 @@ void GSProcess(const bool evaluate_signal)
                      double gain=p_tick.bid-open_price;
                      double gain_atr=gain/live_atr;
                      double locked_profit=0.0;
-                     if(gain_atr>=3.0) locked_profit=2.0*live_atr;
-                     else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
-                     else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                     if(UseAcceleratorTrailing)
+                       {
+                        if(gain_atr>=3.0) locked_profit=2.5*live_atr;
+                        else if(gain_atr>=2.0) locked_profit=1.5*live_atr;
+                        else if(gain_atr>=1.5) locked_profit=1.0*live_atr;
+                       }
+                     else
+                       {
+                        if(gain_atr>=3.0) locked_profit=2.0*live_atr;
+                        else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
+                        else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                       }
                      if(locked_profit>0.0)
                        {
                         double step_sl=NormalizeDouble(open_price+locked_profit,digits);
@@ -358,9 +367,18 @@ void GSProcess(const bool evaluate_signal)
                      double gain=open_price-p_tick.ask;
                      double gain_atr=gain/live_atr;
                      double locked_profit=0.0;
-                     if(gain_atr>=3.0) locked_profit=2.0*live_atr;
-                     else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
-                     else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                     if(UseAcceleratorTrailing)
+                       {
+                        if(gain_atr>=3.0) locked_profit=2.5*live_atr;
+                        else if(gain_atr>=2.0) locked_profit=1.5*live_atr;
+                        else if(gain_atr>=1.5) locked_profit=1.0*live_atr;
+                       }
+                     else
+                       {
+                        if(gain_atr>=3.0) locked_profit=2.0*live_atr;
+                        else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
+                        else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                       }
                      if(locked_profit>0.0)
                        {
                         double step_sl=NormalizeDouble(open_price-locked_profit,digits);
@@ -590,6 +608,19 @@ void GSProcess(const bool evaluate_signal)
                      side=GS_HOLD;
                      reason="HOLD_ADDON_EXISTING_NOT_PROFITABLE";
                      break;
+                    }
+                  if(RequireBreakEvenForAddOn)
+                    {
+                     ENUM_POSITION_TYPE p_dir=(ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+                     double p_open=PositionGetDouble(POSITION_PRICE_OPEN);
+                     double p_sl=PositionGetDouble(POSITION_SL);
+                     bool is_be_locked=(p_dir==POSITION_TYPE_BUY) ? (p_sl>=p_open) : (p_sl>0.0 && p_sl<=p_open);
+                     if(!is_be_locked)
+                       {
+                        side=GS_HOLD;
+                        reason="HOLD_ADDON_EXISTING_NOT_BREAKEVEN";
+                        break;
+                       }
                     }
                   if(MinAddOnDistanceATR>0.0 && GSPositive(data.atr))
                     {

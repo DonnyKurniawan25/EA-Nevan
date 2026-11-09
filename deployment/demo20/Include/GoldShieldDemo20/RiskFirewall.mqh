@@ -153,17 +153,20 @@ public:
       plan.candle_id=data.bar.time;
       plan.entry=(buy ? tick.ask : tick.bid);
       double minimum=(double)MathMax(spec.stops_level,spec.freeze_level)*spec.point+spec.tick_size;
+      double effective_rr=RewardRiskMultiple;
+      if(UseVolatilityExpansionTP && data.adx>=30.0)
+         effective_rr=MathMax(RewardRiskMultiple,1.75);
       if(buy)
         {
          double raw=MathMin(plan.entry-data.atr*StopATRMultiple,data.bar.low-spec.tick_size);
          plan.sl=GSTickDown(MathMin(raw,tick.bid-minimum),spec.tick_size,spec.digits);
-         plan.tp=GSTickUp(plan.entry+(plan.entry-plan.sl)*RewardRiskMultiple,spec.tick_size,spec.digits);
+         plan.tp=GSTickUp(plan.entry+(plan.entry-plan.sl)*effective_rr,spec.tick_size,spec.digits);
         }
       else
         {
          double raw=MathMax(plan.entry+data.atr*StopATRMultiple,data.bar.high+spec.tick_size);
          plan.sl=GSTickUp(MathMax(raw,tick.ask+minimum),spec.tick_size,spec.digits);
-         plan.tp=GSTickDown(plan.entry-(plan.sl-plan.entry)*RewardRiskMultiple,spec.tick_size,spec.digits);
+         plan.tp=GSTickDown(plan.entry-(plan.sl-plan.entry)*effective_rr,spec.tick_size,spec.digits);
         }
       if(!GSValidStops(buy,plan.entry,tick.bid,tick.ask,plan.sl,plan.tp,minimum))
          return GSReject(reason,"INVALID_SERVER_STOP_OR_TARGET");

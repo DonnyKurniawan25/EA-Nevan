@@ -90,6 +90,11 @@ input bool SpreadFreezeOnTrailing=true; // Bekukan modifikasi trailing stop jika
 input double MaxNewsCandleATRMultiple=2.5; // Batas rentang candle M15 vs ATR (deteksi lonjakan berita ekstrim)
 input bool UseMidnightProfitClose=true; // Kunci profit floating sebelum rollover tengah malam (non-kripto)
 input int MidnightCloseMinuteServer=50; // Menit server kunci profit sebelum rollover tengah malam (23:50)
+input bool UseConfluenceScoring=true; // Aktifkan evaluasi skor konfluensi terbobot multi-aturan
+input int MinConfluenceScore=65; // Ambang minimal skor konfluensi untuk validasi order (default: 65 poin)
+input bool UseVolatilityExpansionTP=true; // Perlebar TP runner ke 3.5 ATR saat tren kencang (ADX >= 30)
+input bool UseAcceleratorTrailing=true; // Trailing akselerator agresif kunci laba cepat anti-koreksi
+input bool RequireBreakEvenForAddOn=true; // Zero-risk pyramiding: posisi ke-2 hanya jika posisi 1 sudah lock BE
 
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.05; // Maximum requested volume; never rounded up.
@@ -208,6 +213,7 @@ bool GSValidateSettings(string &reason)
       DailyProfitTargetPct<0.0 || DailyProfitTargetPct>50.0 ||
       DailyProfitTargetUSD<0.0 || WeeklyOpenWaitMinutes<0 || WeeklyOpenWaitMinutes>120 ||
       MidnightCloseMinuteServer<0 || MidnightCloseMinuteServer>59 ||
+      MinConfluenceScore<10 || MinConfluenceScore>100 ||
       LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    return true;

@@ -729,13 +729,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .rule-top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             gap: 8px;
+            margin-bottom: 4px;
         }
         .rule-name {
             font-size: 0.82rem;
             font-weight: 700;
             color: var(--navy);
+            line-height: 1.3;
+            flex: 1 1 auto;
         }
         .rule-badge {
             font-size: 0.68rem;
@@ -743,6 +746,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 2px 7px;
             border-radius: var(--radius-sm);
             white-space: nowrap;
+            flex-shrink: 0;
         }
         .rule-badge.pass {
             background: #dcfce7;
@@ -1238,6 +1242,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 desc: 'Terjadi persilangan baru EMA 20 dan EMA 50 didukung keselarasan tren H1 dan kekuatan ADX.',
                 icon: '⚡'
             },
+            'HOLD_CONFLUENCE_SCORE_LOW': {
+                title: 'Skor Konfluensi Sedang Dikumpulkan (Min 65 Poin)',
+                desc: 'Mayoritas indikator sudah mulai selaras. Robot menunggu skor pembobotan konfluensi mencapai ambang kelulusan (>= 65 Poin) agar peluang menang maksimal.',
+                icon: '📊'
+            },
+            'HOLD_ADDON_EXISTING_NOT_BREAKEVEN': {
+                title: 'Tahan Posisi Tambahan (Zero-Risk Pyramiding Guard)',
+                desc: 'Posisi aktif pertama belum mengunci modal di Break-Even (+0.2 ATR). Posisi kedua hanya dibuka jika posisi pertama sudah 100% bebas risiko modal (Zero Risk).',
+                icon: '🛡️'
+            },
             'HOLD_RULES_NO_SETUP': {
                 title: 'Menunggu Pola Multi-Setup (Pullback / Breakout / Crossover)',
                 desc: 'Kondisi pasar saat ini belum memenuhi salah satu dari 3 setup entri unggulan (Pullback Retest, Box Breakout, atau Baseline Crossover). Robot sabar menahan diri agar tidak masuk di tengah pergerakan liar.',
@@ -1374,24 +1388,56 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
-            const isSessionPass = isTradeActive || isCrypto || (serverHour >= 7 && serverHour < 21);
+            // Sesi Trading Aktif Emas: 02:00–21:00 Server (09:00 WIB Pagi s/d 04:00 WIB Subuh)
+            const isSessionPass = isTradeActive || isCrypto || (serverHour >= 2 && serverHour < 21);
             let sessionStatus = 'pass';
-            let sessionText = 'MEMENUHI ✅ (Sesi Aktif 07-21)';
+            let sessionText = 'MEMENUHI ✅ (Sesi Aktif)';
             if (isCrypto) {
-                sessionText = 'MEMENUHI ✅ (Kripto Buka 24/7)';
+                sessionText = 'MEMENUHI ✅ (Kripto 24/7)';
             } else if (!isSessionPass) {
                 sessionStatus = rsn === 'HOLD_SESSION_FILTER_CLOSED' ? 'block' : 'fail';
-                sessionText = serverHour >= 0 && serverHour < 7 ? 'BELUM BUKA ⏳ (Jam 07:00)' : 'SESI TUTUP 🌙';
+                sessionText = serverHour >= 0 && serverHour < 2 ? 'BELUM BUKA ⏳ (Jam 02:00)' : 'SESI TUTUP 🌙';
+            }
+
+            // Perhitungan Skor Konfluensi Dinamis (0 - 100 Poin)
+            let confScore = 0;
+            if (isTradeActive) {
+                confScore = 100;
+            } else {
+                // HTF Trend (+20)
+                if (!rsn.includes('HOLD_HTF_TREND') && htfFast > 0) confScore += 20;
+                // HTF Slope (+10)
+                if (!rsn.includes('HOLD_HTF_SLOPE')) confScore += 10;
+                // EMA M15 (+10)
+                if (fastEma > 0 && slowEma > 0) confScore += 10;
+                // Setup Model (+15)
+                if (rsn.includes('CANDIDATE') || !rsn.includes('NO_SETUP')) confScore += 15;
+                // ADX Trend (+15 / +10)
+                if (adxVal >= 25.0) confScore += 15;
+                else if (adxVal >= 20.0) confScore += 10;
+                if (rsn !== 'HOLD_ADX_MOMENTUM_FALLING') confScore += 5;
+                // Candle Direction (+10)
+                if (rsn !== 'HOLD_CANDLE_BEARISH' && rsn !== 'HOLD_CANDLE_BULLISH') confScore += 10;
+                // Candle Body & Wick (+5 +5)
+                if (rsn !== 'HOLD_CANDLE_BODY_TOO_SMALL') confScore += 5;
+                if (!rsn.includes('WICK_REJECTION')) confScore += 5;
+                // Tick Volume (+15 / +10 / +5)
+                if (rsn !== 'HOLD_LOW_TICK_VOLUME') confScore += 10;
+                else confScore += 5;
+                // RSI Momentum (+10)
+                if (rsn !== 'HOLD_RSI_MOMENTUM_WEAK') confScore += 10;
+                if (confScore > 100) confScore = 100;
             }
 
             const rules = [
                 {
                     id: 'session',
-                    name: '1. Sesi Jam Bursa Likuiditas (07:00–21:00)',
-                    condition: 'Menghindari jam sepi likuiditas malam / subuh broker untuk memangkas pelebaran spread.',
-                    current: isCrypto ? 'Pasar Kripto 24/7' : (serverHour >= 0 ? `Jam Server: ${serverHour.toString().padStart(2, '0')}:xx (Sesi Utama: 07:00–21:00)` : 'Mengikuti server broker'),
+                    name: '1. Sesi Jam Bursa Likuiditas (02:00–21:00 Server)',
+                    condition: 'Jendela perdagangan aktif: Sesi Asia (09:00 WIB), London, & New York hingga subuh 04:00 WIB.',
+                    current: isCrypto ? 'Pasar Kripto 24/7' : (serverHour >= 0 ? `Jam Server: ${serverHour.toString().padStart(2, '0')}:xx (Sesi Aktif: 02:00–21:00)` : 'Mengikuti server broker'),
                     status: sessionStatus,
-                    badgeText: sessionText
+                    badgeText: sessionText,
+                    poin: 'Syarat Waktu'
                 },
                 {
                     id: 'adx_sideways',
@@ -1399,15 +1445,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Melindungi modal dari pasar flat / sideways tanpa arah.',
                     current: `Nilai ADX Lilin: ${adxVal > 0 ? adxVal.toFixed(2) : '-'} (Ambang Batas Min: 20.0)`,
                     status: isTradeActive || (adxVal >= 20.0 && rsn !== 'HOLD_ADX_SIDEWAYS') ? 'pass' : 'block',
-                    badgeText: (adxVal >= 20.0 && rsn !== 'HOLD_ADX_SIDEWAYS') ? 'MEMENUHI ✅ (Tren Kuat)' : 'TIDAK MEMENUHI ❌ (Sideways)'
+                    badgeText: (adxVal >= 20.0 && rsn !== 'HOLD_ADX_SIDEWAYS') ? 'MEMENUHI ✅ (+15 Poin)' : 'TIDAK MEMENUHI ❌ (Sideways)',
+                    poin: '15 Poin'
                 },
                 {
                     id: 'adx_momentum',
                     name: '3. Momentum Tren Menanjak (Rising ADX)',
                     condition: 'Kekuatan tren pada candle penutupan tidak boleh melemah / melandai turun.',
                     current: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'ADX lilin terpantau melandai turun' : 'Momentum tren kokoh menanjak',
-                    status: isTradeActive || rsn !== 'HOLD_ADX_MOMENTUM_FALLING' ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'BELUM MEMENUHI ⏳ (Melandai)' : 'MEMENUHI ✅'
+                    status: isTradeActive || rsn !== 'HOLD_ADX_MOMENTUM_FALLING' ? 'pass' : 'fail',
+                    badgeText: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'KONTRIBUSI SKOR ⏳ (0 Poin)' : 'MEMENUHI ✅ (+5 Poin)',
+                    poin: '5 Poin'
                 },
                 {
                     id: 'htf_trend',
@@ -1415,47 +1463,53 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Order wajib searah dengan tren institusi H1 (H1 Close & Fast > Slow EMA).',
                     current: htfFast > 0 ? `H1 Fast: ${htfFast.toFixed(2)} | Slow: ${htfSlow.toFixed(2)} (Bullish)` : 'Sesuai tren H1',
                     status: isTradeActive || (!rsn.includes('HOLD_HTF_TREND')) ? 'pass' : 'block',
-                    badgeText: rsn.includes('HOLD_HTF_TREND') ? 'BERTENTANGAN ❌' : 'MEMENUHI ✅ (Searah H1)'
+                    badgeText: rsn.includes('HOLD_HTF_TREND') ? 'BERTENTANGAN 🛑' : 'MEMENUHI ✅ (+20 Poin)',
+                    poin: '20 Poin'
                 },
                 {
                     id: 'htf_slope',
                     name: '5. Sudut Kemiringan Tren H1 (Slope Alignment)',
                     condition: 'Sudut pergerakan garis EMA H1 harus menanjak tegas, bukan mendatar.',
                     current: rsn.includes('HOLD_HTF_SLOPE') ? 'Sudut EMA H1 mendatar/kurang tajam' : 'Sudut EMA H1 menanjak tegas',
-                    status: isTradeActive || (!rsn.includes('HOLD_HTF_SLOPE')) ? 'pass' : 'block',
-                    badgeText: rsn.includes('HOLD_HTF_SLOPE') ? 'BELUM MEMENUHI ⏳ (Mendatar)' : 'MEMENUHI ✅'
+                    status: isTradeActive || (!rsn.includes('HOLD_HTF_SLOPE')) ? 'pass' : 'fail',
+                    badgeText: rsn.includes('HOLD_HTF_SLOPE') ? 'KONTRIBUSI SKOR ⏳ (0 Poin)' : 'MEMENUHI ✅ (+10 Poin)',
+                    poin: '10 Poin'
                 },
                 {
                     id: 'candle_dir',
                     name: '6. Arah Warna Lilin M15 (Candle Momentum)',
-                    condition: 'Sinyal BUY wajib lilin hijau, sinyal SELL wajib lilin merah.',
-                    current: rsn === 'HOLD_CANDLE_BEARISH' ? 'Lilin M15 merah (Menunggu pantulan hijau)' : (rsn === 'HOLD_CANDLE_BULLISH' ? 'Lilin M15 hijau (Menunggu merah)' : 'Warna lilin M15 selaras tren'),
+                    condition: 'Sinyal BUY lilin hijau, sinyal SELL lilin merah (toleransi pullback/retest).',
+                    current: rsn === 'HOLD_CANDLE_BEARISH' ? 'Lilin M15 merah (Koreksi pullback)' : (rsn === 'HOLD_CANDLE_BULLISH' ? 'Lilin M15 hijau (Koreksi rally)' : 'Warna lilin M15 selaras tren'),
                     status: isTradeActive || (rsn !== 'HOLD_CANDLE_BEARISH' && rsn !== 'HOLD_CANDLE_BULLISH') ? 'pass' : 'fail',
-                    badgeText: (rsn === 'HOLD_CANDLE_BEARISH' || rsn === 'HOLD_CANDLE_BULLISH') ? 'BELUM MEMENUHI ⏳ (Warna Koreksi)' : 'MEMENUHI ✅'
+                    badgeText: (rsn === 'HOLD_CANDLE_BEARISH' || rsn === 'HOLD_CANDLE_BULLISH') ? 'KONTRIBUSI SKOR ⏳ (0 Poin)' : 'MEMENUHI ✅ (+10 Poin)',
+                    poin: '10 Poin'
                 },
                 {
                     id: 'candle_body',
                     name: '7. Bobot Badan Lilin M15 (Min Body >= 40%)',
                     condition: 'Menolak candle doji / lilin banci tanpa komitmen di area sempit.',
                     current: rsn === 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'Badan lilin < 40% (Doji/ragu-ragu)' : 'Badan lilin proporsional & solid',
-                    status: isTradeActive || rsn !== 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'TIDAK MEMENUHI ❌ (Doji Tipis)' : 'MEMENUHI ✅'
+                    status: isTradeActive || rsn !== 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'pass' : 'fail',
+                    badgeText: rsn === 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'KONTRIBUSI SKOR ⏳ (0 Poin)' : 'MEMENUHI ✅ (+5 Poin)',
+                    poin: '5 Poin'
                 },
                 {
                     id: 'wick_reject',
                     name: '8. Penolakan Ekor Lilin (Wick Rejection Guard)',
                     condition: 'Tidak ada perlawanan ekor panjang berlawanan arah sinyal.',
                     current: rsn.includes('WICK_REJECTION') ? 'Terdeteksi perlawanan ekor penolakan' : 'Aman dari penolakan ekor berlawanan',
-                    status: isTradeActive || (!rsn.includes('WICK_REJECTION')) ? 'pass' : 'block',
-                    badgeText: rsn.includes('WICK_REJECTION') ? 'TIDAK MEMENUHI ⚠️ (Ekor Panjang)' : 'MEMENUHI ✅'
+                    status: isTradeActive || (!rsn.includes('WICK_REJECTION')) ? 'pass' : 'fail',
+                    badgeText: rsn.includes('WICK_REJECTION') ? 'KONTRIBUSI SKOR ⏳ (0 Poin)' : 'MEMENUHI ✅ (+5 Poin)',
+                    poin: '5 Poin'
                 },
                 {
                     id: 'tick_volume',
                     name: '9. Volume Transaksi Tick (Min 75% Rata-Rata)',
-                    condition: 'Aktivitas pasar harus aktif (volume tick >= 0.75x rata-rata 5 candle).',
-                    current: rsn === 'HOLD_LOW_TICK_VOLUME' ? 'Volume tick di bawah 75% rata-rata 5 lilin' : 'Aktivitas volume normal / tinggi',
+                    condition: 'Aktivitas transaksi pasar aktif (volume tick >= 0.75x rata-rata 5 candle).',
+                    current: rsn === 'HOLD_LOW_TICK_VOLUME' ? 'Volume tick sedang di bawah rata-rata' : 'Aktivitas volume normal / tinggi',
                     status: isTradeActive || rsn !== 'HOLD_LOW_TICK_VOLUME' ? 'pass' : 'fail',
-                    badgeText: rsn === 'HOLD_LOW_TICK_VOLUME' ? 'BELUM MEMENUHI ⏳ (Volume Sepi)' : 'MEMENUHI ✅'
+                    badgeText: rsn === 'HOLD_LOW_TICK_VOLUME' ? 'KONTRIBUSI SKOR ⏳ (+5 Poin)' : 'MEMENUHI ✅ (+10 Poin)',
+                    poin: '10 Poin'
                 },
                 {
                     id: 'price_stretch',
@@ -1463,7 +1517,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Mencegah beli di pucuk tertinggi atau jual di lembah terdalam.',
                     current: rsn === 'HOLD_PRICE_OVEREXTENDED' ? 'Jarak harga merenggang > 1.8 ATR dari EMA' : 'Jarak harga wajar & aman dari pucuk',
                     status: isTradeActive || rsn !== 'HOLD_PRICE_OVEREXTENDED' ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_PRICE_OVEREXTENDED' ? 'TIDAK MEMENUHI 🛑 (Overextended)' : 'MEMENUHI ✅ (Anti-Pucuk)'
+                    badgeText: rsn === 'HOLD_PRICE_OVEREXTENDED' ? 'TIDAK MEMENUHI 🛑 (Pucuk)' : 'MEMENUHI ✅ (Pelindung Mutlak)',
+                    poin: 'Pelindung Mutlak'
                 },
                 {
                     id: 'news_surge',
@@ -1471,7 +1526,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Memblokir order saat lonjakan liar berita tak terkendali.',
                     current: rsn === 'HOLD_NEWS_VOLATILITY_SURGE' ? 'Terjadi lonjakan candle > 2.5x ATR' : 'Volatilitas stabil terkendali',
                     status: isTradeActive || rsn !== 'HOLD_NEWS_VOLATILITY_SURGE' ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_NEWS_VOLATILITY_SURGE' ? 'BLOKIR BERITA ⚡' : 'MEMENUHI ✅'
+                    badgeText: rsn === 'HOLD_NEWS_VOLATILITY_SURGE' ? 'BLOKIR BERITA ⚡' : 'MEMENUHI ✅ (Pelindung Mutlak)',
+                    poin: 'Pelindung Mutlak'
                 },
                 {
                     id: 'spread_atr',
@@ -1479,7 +1535,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Menolak order saat broker melebarkan spread di atas batas wajar.',
                     current: rsn === 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'Spread broker melebar di atas 30% ATR' : 'Spread broker rapat & hemat biaya',
                     status: isTradeActive || rsn !== 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'SPREAD MELEBAR ↔️' : 'MEMENUHI ✅'
+                    badgeText: rsn === 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'SPREAD MELEBAR ↔️' : 'MEMENUHI ✅ (Pelindung Mutlak)',
+                    poin: 'Pelindung Mutlak'
                 },
                 {
                     id: 'midnight_rollover',
@@ -1487,7 +1544,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Blokir entri saat pergantian hari untuk hindari lonjakan spread & swap.',
                     current: rsn === 'HOLD_MIDNIGHT_ROLLOVER' ? 'Sedang jam rollover pergantian hari' : 'Di luar jam rollover tengah malam',
                     status: isTradeActive || rsn !== 'HOLD_MIDNIGHT_ROLLOVER' ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_MIDNIGHT_ROLLOVER' ? 'ROLLOVER MALAM 🌙' : 'MEMENUHI ✅'
+                    badgeText: rsn === 'HOLD_MIDNIGHT_ROLLOVER' ? 'ROLLOVER MALAM 🌙' : 'MEMENUHI ✅ (Pelindung Mutlak)',
+                    poin: 'Pelindung Mutlak'
                 },
                 {
                     id: 'daily_quota',
@@ -1495,24 +1553,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     condition: 'Mencegah overtrading berlebih dan melindungi modal harian.',
                     current: `Entri hari ini: ${s.entries_count || 0} / ${s.max_entries || 10}`,
                     status: isTradeActive || (rsn !== 'HOLD_DAILY_ENTRY_LIMIT' && rsn !== 'HOLD_DAILY_PROFIT_TARGET_REACHED') ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_DAILY_PROFIT_TARGET_REACHED' ? 'TARGET 2% TERCAPAI 🏆' : (rsn === 'HOLD_DAILY_ENTRY_LIMIT' ? 'KUOTA HABIS 🛑' : 'MEMENUHI ✅')
+                    badgeText: rsn === 'HOLD_DAILY_PROFIT_TARGET_REACHED' ? 'TARGET 2% TERCAPAI 🏆' : (rsn === 'HOLD_DAILY_ENTRY_LIMIT' ? 'KUOTA HABIS 🛑' : 'MEMENUHI ✅ (Pelindung Mutlak)'),
+                    poin: 'Pelindung Mutlak'
                 },
                 {
                     id: 'setup_pattern',
                     name: '15. Pola Multi-Setup (Pullback / Breakout / Cross)',
                     condition: 'Wajib terkonfirmasi salah satu dari 3 setup teknikal konfluensi.',
-                    current: isTradeActive ? 'Posisi aktif berjalan' : (rsn.includes('CANDIDATE') ? 'Setup entri terkonfirmasi' : 'Menunggu lilin setup berikutnya'),
-                    status: isTradeActive || rsn.includes('CANDIDATE') ? 'pass' : (rsn === 'HOLD_RULES_NO_SETUP' ? 'fail' : 'pass'),
-                    badgeText: isTradeActive || rsn.includes('CANDIDATE') ? 'MEMENUHI ✅ (Setup Terbuka)' : 'BELUM ADA SETUP ⏳'
+                    current: isTradeActive ? 'Posisi aktif berjalan' : (rsn.includes('CANDIDATE') ? 'Setup entri terkonfirmasi' : 'Pola teknikal aktif dipantau'),
+                    status: isTradeActive || rsn.includes('CANDIDATE') || !rsn.includes('NO_SETUP') ? 'pass' : 'fail',
+                    badgeText: isTradeActive || rsn.includes('CANDIDATE') || !rsn.includes('NO_SETUP') ? 'MEMENUHI ✅ (+15 Poin)' : 'KONTRIBUSI SKOR ⏳ (0 Poin)',
+                    poin: '15 Poin'
                 }
             ];
 
             let passCount = rules.filter(r => r.status === 'pass').length;
             const summaryBadge = document.getElementById('rules-summary-badge');
             if (summaryBadge) {
-                summaryBadge.textContent = `${passCount} / ${rules.length} Aturan Memenuhi`;
-                summaryBadge.style.background = passCount === rules.length ? '#dcfce7' : '#eff6ff';
-                summaryBadge.style.color = passCount === rules.length ? '#15803d' : '#1d4ed8';
+                const isReadyToTrade = confScore >= 65;
+                summaryBadge.innerHTML = `
+                    <span style="margin-right:6px;">${passCount} / ${rules.length} Memenuhi</span>
+                    <span style="background:${isReadyToTrade ? '#16a34a' : '#2563eb'}; color:#ffffff; padding:2px 8px; border-radius:12px; font-size:0.72rem; font-weight:700;">
+                        Skor Konfluensi: ${confScore}/100 (Ambang >= 65) • ${isReadyToTrade ? 'SIAP ENTRY 🎯' : 'KUMPULKAN SKOR ⏳'}
+                    </span>
+                `;
+                summaryBadge.style.background = '#f1f5f9';
+                summaryBadge.style.color = '#0f172a';
+                summaryBadge.style.border = '1px solid #cbd5e1';
             }
 
             const container = document.getElementById('rules-grid');
@@ -1532,7 +1599,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                     <div class="rule-condition">${r.condition}</div>
                     <div class="rule-current">
-                        <span style="color:var(--text-muted); font-size:0.7rem;">Kondisi Live:</span>
+                        <span style="color:var(--text-muted); font-size:0.7rem;">Kondisi Live (${r.poin}):</span>
                         <span>${r.current}</span>
                     </div>
                 </div>`;
@@ -1970,31 +2037,37 @@ def get_latest_data():
         "htf_slow": "-"
     }
 
-    if latest_audit:
-        try:
-            with open(latest_audit, "r", encoding="utf-8", errors="ignore") as f:
-                r_rows = list(csv.reader(f))
-                for row in reversed(r_rows):
-                    if len(row) > 7 and row[4] == "SIGNAL":
-                        market_decision["bar_time"] = row[2]
-                        market_decision["reason"] = row[7]
-                        details = row[8] if len(row) > 8 else ""
+    if audit_files:
+        sorted_audits = sorted(audit_files, key=lambda p: p.stat().st_mtime, reverse=True)
+        found_signal = False
+        for af in sorted_audits:
+            if found_signal:
+                break
+            try:
+                with open(af, "r", encoding="utf-8", errors="ignore") as f:
+                    r_rows = list(csv.reader(f))
+                    for row in reversed(r_rows):
+                        if len(row) > 7 and row[4] == "SIGNAL":
+                            market_decision["bar_time"] = row[2]
+                            market_decision["reason"] = row[7]
+                            details = row[8] if len(row) > 8 else ""
 
-                        def parse_metric(key):
-                            m = re.search(rf"\b{key}=([0-9.]+)", details)
-                            return m.group(1) if m else "-"
+                            def parse_metric(key):
+                                m = re.search(rf"\b{key}=([0-9.]+)", details)
+                                return m.group(1) if m else "-"
 
-                        market_decision["close"] = parse_metric("close")
-                        market_decision["rsi"] = parse_metric("rsi")
-                        market_decision["adx"] = parse_metric("adx")
-                        market_decision["atr"] = parse_metric("atr")
-                        market_decision["fast_ema"] = parse_metric("fast")
-                        market_decision["slow_ema"] = parse_metric("slow")
-                        market_decision["htf_fast"] = parse_metric("htf_fast")
-                        market_decision["htf_slow"] = parse_metric("htf_slow")
-                        break
-        except Exception:
-            pass
+                            market_decision["close"] = parse_metric("close")
+                            market_decision["rsi"] = parse_metric("rsi")
+                            market_decision["adx"] = parse_metric("adx")
+                            market_decision["atr"] = parse_metric("atr")
+                            market_decision["fast_ema"] = parse_metric("fast")
+                            market_decision["slow_ema"] = parse_metric("slow")
+                            market_decision["htf_fast"] = parse_metric("htf_fast")
+                            market_decision["htf_slow"] = parse_metric("htf_slow")
+                            found_signal = True
+                            break
+            except Exception:
+                pass
 
     data["market_decision"] = market_decision
 
