@@ -545,7 +545,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="banner-body">
                 <div class="banner-title" id="banner-title">Status Trading: Standby Menunggu Sinyal Valid</div>
                 <div class="banner-text" id="banner-text">
-                    Robot sedang memantau chart <strong>BTCUSDm (M15)</strong>. Saat ini <strong>0 posisi aktif</strong> karena pasar sedang konsolidasi/sideways (ADX < 22). Robot menjaga modal dan akan otomatis membuka posisi baru saat candle penutupan berikutnya menembus tren terkonfirmasi.
+                    Robot sedang memantau chart secara real-time. Menjaga modal dan otomatis membuka posisi baru saat candle penutupan berikutnya menembus tren terkonfirmasi.
                 </div>
             </div>
         </div>
@@ -812,23 +812,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const bannerTitle = document.getElementById('banner-title');
             const bannerText = document.getElementById('banner-text');
             const headerStatus = document.getElementById('header-status');
+            const activeSym = s.active_symbol || 'XAUUSDm';
 
             if (pos.length > 0) {
                 headerStatus.textContent = `TRADING AKTIF • ${pos.length} POSISI`;
                 bannerTitle.textContent = `🚀 Posisi Aktif Berjalan (${pos.length} Order)`;
-                bannerText.innerHTML = `Order sedang aktif di pasar dan dipantau pengaman Trailing Stop, Stepped Lock, serta Take Profit 50%. Floating saat ini: <strong>${formatProfit(totalFloating)}</strong>.`;
+                bannerText.innerHTML = `Order sedang aktif di pasar <strong>${activeSym}</strong> dan dipantau pengaman Trailing Stop, Stepped Lock, serta Take Profit 50%. Floating saat ini: <strong>${formatProfit(totalFloating)}</strong>.`;
             } else {
                 headerStatus.textContent = 'STANDBY • WAIT CANDLE';
                 const reason = s.core_reason || '';
                 if (reason.includes('ADX_SIDEWAYS')) {
                     bannerTitle.textContent = 'Status: Standby Menunggu Momentum Tren (Filter Sideways Aktif)';
-                    bannerText.innerHTML = `Robot mendeteksi pasar <strong>BTCUSDm</strong> sedang bergerak sideways/datar (ADX < 22). Robot menahan diri agar tidak terjebak sinyal palsu, dan siap masuk saat tren kuat terbentuk.`;
+                    bannerText.innerHTML = `Robot mendeteksi pasar <strong>${activeSym}</strong> sedang bergerak sideways/datar (ADX < 20). Robot menahan diri agar tidak terjebak sinyal palsu, dan siap masuk saat tren kuat terbentuk.`;
                 } else if (reason.includes('HTF_TREND')) {
                     bannerTitle.textContent = 'Status: Standby Menunggu Konfirmasi Tren Lebih Besar (H1)';
-                    bannerText.innerHTML = `Sinyal M15 menunggu keselarasan tren H1 untuk memastikan probabilitas menang tinggi. Modal aman terlindungi.`;
+                    bannerText.innerHTML = `Sinyal M15 <strong>${activeSym}</strong> menunggu keselarasan tren H1 untuk memastikan probabilitas menang tinggi. Modal aman terlindungi.`;
+                } else if (reason.includes('SESSION_FILTER')) {
+                    bannerTitle.textContent = `Status: Standby Di Luar Jadwal Sesi Utama (${activeSym})`;
+                    bannerText.innerHTML = `Robot menunggu jendela sesi likuiditas tinggi (London & New York, 07:00–21:00 server). Modal aman dari spread malam.`;
                 } else {
-                    bannerTitle.textContent = 'Status Trading: Standby Menunggu Penutupan Candle M15';
-                    bannerText.innerHTML = `Robot sedang aktif mengamati pergerakan harga <strong>BTCUSDm (M15)</strong>. Transaksi terakhir ditutup untung <strong>+$0.72 USD</strong>. Sinyal baru dievaluasi setiap kali candle 15 menit selesai tutup.`;
+                    bannerTitle.textContent = `Status Trading: Standby Menunggu Sinyal Valid (${activeSym})`;
+                    bannerText.innerHTML = `Robot sedang aktif memantau chart <strong>${activeSym} (M15)</strong> secara real-time. Sinyal baru dievaluasi setiap kali candle 15 menit selesai tutup.`;
                 }
             }
 
@@ -1005,6 +1009,7 @@ def get_latest_data():
             data["summary"]["core_state"] = d.get("core_state", "READY")
             data["summary"]["core_reason"] = d.get("core_reason", "")
             data["summary"]["trial_status"] = d.get("trial_status", "")
+            data["summary"]["active_symbol"] = d.get("symbol", "XAUUSDm")
 
     # 3. Parse positions_live.csv if exists
     pos_file = DATA_DIR / "positions_live.csv"
