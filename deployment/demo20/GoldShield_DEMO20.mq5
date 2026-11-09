@@ -114,6 +114,41 @@ void GSProcess(const bool evaluate_signal)
      }
    g_had_position=(g_owned.count>0);
 
+   // Rule -1: Manual Dashboard Close Command (Interaksi Tombol Tutup Posisi via Web Dashboard)
+   if(FileIsExist("GoldShield\\MANUAL_CLOSE"))
+     {
+      int h=FileOpen("GoldShield\\MANUAL_CLOSE",FILE_READ|FILE_TXT|FILE_ANSI);
+      ulong target_ticket=0;
+      if(h!=INVALID_HANDLE)
+        {
+         string line=FileReadString(h);
+         target_ticket=(ulong)StringToInteger(line);
+         FileClose(h);
+        }
+      FileDelete("GoldShield\\MANUAL_CLOSE");
+
+      if(g_owned.count>0)
+        {
+         for(int i=PositionsTotal()-1;i>=0;i--)
+           {
+            ulong t=PositionGetTicket(i);
+            if(t==0 || !PositionSelectByTicket(t)) continue;
+            if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+              {
+               if(target_ticket==0 || target_ticket==t)
+                 {
+                  string c_reason="";
+                  double profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+                  if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"MANUAL_DASHBOARD_CLOSE"))
+                    {
+                     g_log.Event("MANUAL_CLOSE","DASHBOARD_USER_COMMAND",StringFormat("ticket=%I64u profit=%.2f",t,profit));
+                    }
+                 }
+              }
+           }
+        }
+     }
+
    // Rule 0: Friday Pre-Close Exit (Hindari weekend gap risk pada instrumen non-crypto)
    if(UseFridayCloseGuard && g_owned.count>0)
      {
