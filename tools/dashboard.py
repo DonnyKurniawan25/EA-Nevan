@@ -42,6 +42,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             --border: #e2e8f0;
             --border-hover: #cbd5e1;
             --text-main: #0f172a;
+            --navy: #0f172a;
             --text-muted: #64748b;
             --text-subtle: #94a3b8;
             --primary: #1d4ed8;
@@ -454,6 +455,66 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.4;
         }
 
+        /* REAL-TIME CHART CARD */
+        .chart-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .chart-header {
+            padding: 12px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .chart-title-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chart-pill-btn {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .chart-pill-btn:hover {
+            color: var(--primary);
+            border-color: var(--cyan);
+        }
+        .chart-pill-btn.active {
+            background: var(--primary);
+            color: #ffffff !important;
+            border-color: var(--primary);
+            box-shadow: 0 1px 3px rgba(29, 78, 216, 0.25);
+        }
+        .chart-frame-wrapper {
+            width: 100%;
+            height: 480px;
+            background: #ffffff;
+            position: relative;
+        }
+
         /* FOOTER */
         footer {
             margin-top: 24px;
@@ -497,6 +558,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
             .stat-sub {
                 font-size: 0.72rem;
+            }
+            .chart-frame-wrapper {
+                height: 380px;
+            }
+            .chart-header {
+                padding: 10px 14px;
             }
             .banner-title { font-size: 0.86rem; }
             .banner-text { font-size: 0.78rem; }
@@ -597,6 +664,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <span>State:</span>
                     <strong class="mono" id="val-state">READY</strong>
                 </div>
+            </div>
+        </div>
+
+        <!-- REAL-TIME LIVE CHART CARD -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title-box">
+                    <span>📈</span>
+                    <span id="chart-title">Grafik Live: XAUUSD (Emas M15)</span>
+                    <span class="pill pill-buy" style="font-size: 0.68rem; padding: 2px 7px;">REAL-TIME</span>
+                </div>
+                <div class="chart-controls">
+                    <button type="button" class="chart-pill-btn active" id="btn-chart-gold" onclick="selectChart('XAUUSD', true)">Emas (XAU)</button>
+                    <button type="button" class="chart-pill-btn" id="btn-chart-btc" onclick="selectChart('BTCUSD', true)">Bitcoin (BTC)</button>
+                </div>
+            </div>
+            <div class="chart-frame-wrapper">
+                <iframe id="tv-chart-frame"
+                        src="https://s.tradingview.com/widgetembed/?symbol=OANDA%3AXAUUSD&interval=15&theme=light&style=1&timezone=Asia%2FJakarta&locale=id"
+                        style="width: 100%; height: 100%; border: none;"
+                        loading="lazy"
+                        allowtransparency="true"
+                        scrolling="no">
+                </iframe>
             </div>
         </div>
 
@@ -741,11 +832,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById('tab-deals').style.display = tabName === 'deals' ? 'block' : 'none';
             document.getElementById('tab-audit').style.display = tabName === 'audit' ? 'block' : 'none';
 
-            const buttons = document.querySelectorAll('.tab-btn');
+            const buttons = document.querySelectorAll('.tabs-header .tab-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
             if (tabName === 'positions') buttons[0].classList.add('active');
             if (tabName === 'deals') buttons[1].classList.add('active');
             if (tabName === 'audit') buttons[2].classList.add('active');
+        }
+
+        let activeChartSymbol = 'XAUUSD';
+        let userChartOverride = false;
+
+        function selectChart(target, isUserClick = false) {
+            if (isUserClick) userChartOverride = true;
+            if (activeChartSymbol === target && !isUserClick) return;
+            activeChartSymbol = target;
+
+            const frame = document.getElementById('tv-chart-frame');
+            const title = document.getElementById('chart-title');
+            const btnGold = document.getElementById('btn-chart-gold');
+            const btnBtc = document.getElementById('btn-chart-btc');
+
+            let tvSym = "OANDA%3AXAUUSD";
+            let label = "XAUUSD (Emas M15)";
+            if (target === 'BTCUSD') {
+                tvSym = "BINANCE%3ABTCUSDT";
+                label = "BTCUSD (Bitcoin M15)";
+                if (btnBtc) btnBtc.classList.add('active');
+                if (btnGold) btnGold.classList.remove('active');
+            } else {
+                if (btnGold) btnGold.classList.add('active');
+                if (btnBtc) btnBtc.classList.remove('active');
+            }
+
+            if (title) title.textContent = `Grafik Live: ${label}`;
+            if (frame) {
+                frame.src = `https://s.tradingview.com/widgetembed/?symbol=${tvSym}&interval=15&theme=light&style=1&timezone=Asia%2FJakarta&locale=id`;
+            }
         }
 
         function formatCurrency(val) {
@@ -813,6 +935,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const bannerText = document.getElementById('banner-text');
             const headerStatus = document.getElementById('header-status');
             const activeSym = s.active_symbol || 'XAUUSDm';
+
+            // Auto sync live chart symbol to active session
+            if (!userChartOverride) {
+                const targetSym = activeSym.toUpperCase().includes('BTC') ? 'BTCUSD' : 'XAUUSD';
+                if (activeChartSymbol !== targetSym) {
+                    selectChart(targetSym, false);
+                }
+            }
 
             if (pos.length > 0) {
                 headerStatus.textContent = `TRADING AKTIF • ${pos.length} POSISI`;
