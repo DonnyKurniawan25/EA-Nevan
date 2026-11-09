@@ -18,7 +18,7 @@ input group "CLOSED CANDLE RULES - baseline teknis"
 input GSSignalModel SignalModel=GS_BASELINE; // Experimental confirmation did not pass comparative testing.
 input bool UseHTFTrendFilter=true; // Multi-timeframe trend filter (H1 EMA confirmation)
 input ENUM_TIMEFRAMES TrendTimeframe=PERIOD_H1;
-input double MaxEntryStretchATR=1.2; // Batas toleransi jarak harga ke EMA (anti-pucuk/lembah)
+input double MaxEntryStretchATR=1.8; // Batas toleransi jarak harga ke EMA (anti-pucuk/lembah)
 input int FastEMAPeriod=20;
 input int SlowEMAPeriod=50;
 input int RSIPeriod=14;

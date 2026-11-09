@@ -12,6 +12,22 @@ DROPIN_PATH = Path('/home/ubuntu/.config/systemd/user/goldshield-server-demo.ser
 
 
 def get_current_session():
+    # Periksa proses terminal64.exe yang sedang berjalan nyata
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            cmdline = proc.info.get('cmdline') or []
+            cmdline_str = " ".join(cmdline)
+            if "terminal64.exe" in cmdline_str and "/config:" in cmdline_str:
+                for part in cmdline:
+                    if "/config:" in part:
+                        cfg_path = part.split("/config:", 1)[1].replace("Z:", "").replace("\\", "/")
+                        p = Path(cfg_path).parent
+                        if p.exists():
+                            return p
+    except Exception:
+        pass
+
     if not DROPIN_PATH.exists():
         return None
     content = DROPIN_PATH.read_text()
@@ -32,18 +48,14 @@ def switch(target_dir):
         sys.exit(f"Stage verification receipt missing in {target_dir}")
 
     meta = json.loads((target_dir / 'session.json').read_text())
-    symbol = meta.get('symbol', 'UNKNOWN')
+    symbol = meta.get('symbol') or meta.get('chart_symbol') or 'XAUUSDm'
     magic = meta.get('magic', 0)
 
     content = f"[Service]\nEnvironment=GOLDSHIELD_SESSION_DIR={target_dir}\nEnvironment=WINEDEBUG=-all\n"
     DROPIN_PATH.write_text(content)
 
-    env = {
-        'XDG_RUNTIME_DIR': '/run/user/1000',
-        'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus'
-    }
-    subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True, env=env)
-    subprocess.run(['systemctl', '--user', 'restart', 'goldshield-server-demo.service'], check=True, env=env)
+    subprocess.run(['systemctl', '--user', '-M', 'ubuntu@', 'daemon-reload'], check=True)
+    subprocess.run(['systemctl', '--user', '-M', 'ubuntu@', 'restart', 'goldshield-server-demo.service'], check=True)
     print(f"SWITCHED_TO_{symbol}_MAGIC_{magic}")
 
 
@@ -55,7 +67,7 @@ def show_status():
     meta_path = current / 'session.json'
     if meta_path.exists():
         meta = json.loads(meta_path.read_text())
-        symbol = meta.get('symbol', 'UNKNOWN')
+        symbol = meta.get('symbol') or meta.get('chart_symbol') or ('BTCUSDm' if 'btc' in current.name else 'XAUUSDm')
         magic = meta.get('magic', 0)
         print(f"ACTIVE_SESSION: {current.name} (Symbol: {symbol}, Magic: {magic})")
     else:

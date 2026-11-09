@@ -147,7 +147,18 @@ public:
          (ulong)PositionGetInteger(POSITION_MAGIC)!=MagicNumber ||
          StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
          return GSReject(reason,"MODIFY_OWNERSHIP_REJECTED");
-      bool sent=m_trade.PositionModify(ticket,sl,tp);
+      bool sent=false;
+      for(int attempt=1;attempt<=3;attempt++)
+        {
+         sent=m_trade.PositionModify(ticket,sl,tp);
+         uint code=m_trade.ResultRetcode();
+         if(sent || code==TRADE_RETCODE_DONE || code==TRADE_RETCODE_NO_CHANGES)
+           {
+            sent=true;
+            break;
+           }
+         Sleep(500); // Re-try jeda 500ms jika requote / harga bergerak cepat
+        }
       log.Event("STOP_MODIFY",modify_reason,StringFormat("ticket=%I64u sent=%s retcode=%u sl=%.5f tp=%.5f",
                 ticket,(sent ? "true" : "false"),m_trade.ResultRetcode(),sl,tp));
       return sent;
