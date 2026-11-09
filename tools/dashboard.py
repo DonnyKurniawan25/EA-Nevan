@@ -43,7 +43,7 @@ AUTH_TOKEN = os.environ.get("DASHBOARD_TOKEN", AUTH_TOKEN)
 
 # Operator Trading PIN (Khusus Donny untuk Transaksi)
 TRADING_PIN_FILE = Path("/etc/goldshield/trading_pin.env")
-TRADING_PIN = "250892"
+TRADING_PIN = "251029"
 if TRADING_PIN_FILE.exists():
     try:
         for _line in TRADING_PIN_FILE.read_text().splitlines():
