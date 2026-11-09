@@ -25,7 +25,21 @@ DEFAULT_PORT = 8089
 DEFAULT_HOST = "0.0.0.0"
 PID_FILE = Path("/tmp/goldshield-dashboard.pid")
 DATA_DIR = Path("/home/ubuntu/.mt5/drive_c/Program Files/MetaTrader 5/MQL5/Files/GoldShield")
-AUTH_TOKEN = os.environ.get("DASHBOARD_TOKEN", "goldshield-demo")
+
+# Dashboard Auth Token (Keamanan Akses Web)
+DASHBOARD_TOKEN_FILE = Path("/etc/goldshield/dashboard_token.env")
+AUTH_TOKEN = "97d7c1c95b3c37f7322025414163bc1c1e664cf603e20acb"
+if DASHBOARD_TOKEN_FILE.exists():
+    try:
+        for _line in DASHBOARD_TOKEN_FILE.read_text().splitlines():
+            if _line.strip().startswith("DASHBOARD_TOKEN="):
+                _tok = _line.strip().split("=", 1)[1].strip().strip('"').strip("'")
+                if _tok:
+                    AUTH_TOKEN = _tok
+                break
+    except Exception:
+        pass
+AUTH_TOKEN = os.environ.get("DASHBOARD_TOKEN", AUTH_TOKEN)
 
 # Operator Trading PIN (Khusus Donny untuk Transaksi)
 TRADING_PIN_FILE = Path("/etc/goldshield/trading_pin.env")
@@ -34,7 +48,9 @@ if TRADING_PIN_FILE.exists():
     try:
         for _line in TRADING_PIN_FILE.read_text().splitlines():
             if _line.strip().startswith("TRADING_PIN="):
-                TRADING_PIN = _line.strip().split("=", 1)[1].strip().strip('"').strip("'")
+                _pin = _line.strip().split("=", 1)[1].strip().strip('"').strip("'")
+                if _pin:
+                    TRADING_PIN = _pin
                 break
     except Exception:
         pass
@@ -1654,7 +1670,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <script>
         let currentTab = 'positions';
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token') || 'goldshield-demo';
+        const token = urlParams.get('token') || '';
 
         // Operator PIN State & Management
         let operatorPin = sessionStorage.getItem('goldshield_trading_pin') || '';
@@ -1718,7 +1734,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const pinInput = document.getElementById('input-pin');
             const pin = (pinInput ? pinInput.value : '').trim();
             const errBox = document.getElementById('pin-error-msg');
-            const curToken = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
+            const curToken = new URLSearchParams(window.location.search).get('token') || '';
 
             if (!pin || pin.length < 4) {
                 if (errBox) {
@@ -1837,7 +1853,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 if (!confirm(confirmMsg)) return;
 
-                const curToken = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
+                const curToken = new URLSearchParams(window.location.search).get('token') || '';
                 fetch(`/api/order?token=${curToken}&pin=${encodeURIComponent(pin)}&type=${side}&lot=${lot}&sl=${sl}&tp=${tp}`, { method: 'POST' })
                     .then(r => r.json())
                     .then(res => {
@@ -2589,7 +2605,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (!confirm(`Konfirmasi Tutup Posisi:\nApakah Anda yakin ingin menutup ${label} sekarang?\n\nPerintah akan langsung dikirim ke MetaTrader 5 dan posisi akan ditutup di harga pasar.`)) {
                     return;
                 }
-                const curToken = new URLSearchParams(window.location.search).get('token') || 'goldshield-demo';
+                const curToken = new URLSearchParams(window.location.search).get('token') || '';
                 const targetTicket = isAll ? '0' : ticket;
 
                 fetch(`/api/close?ticket=${targetTicket}&token=${curToken}&pin=${encodeURIComponent(pin)}`, { method: 'POST' })
@@ -2846,14 +2862,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         # Security check
         if not self.check_auth():
-            self.send_response(HTTPStatus.UNAUTHORIZED)
+            self.send_response(HTTPStatus.FORBIDDEN)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(b"""
             <html><body style="font-family:sans-serif; text-align:center; padding-top:60px; background:#f8fafc; color:#0f172a;">
-            <h2>Akses Ditolak: Token Diperlukan</h2>
-            <p>Silakan gunakan URL lengkap dengan token otentikasi.</p>
-            <p>Contoh: <code>http://[SERVER_IP]:8089/?token=goldshield-demo</code></p>
+            <h2>403 Forbidden</h2>
+            <p>Akses Ditolak. Token otentikasi tidak valid atau tidak disertakan.</p>
             </body></html>
             """)
             return
