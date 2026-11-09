@@ -332,7 +332,7 @@ void GSProcess(const bool evaluate_signal)
                           }
                        }
                     }
-                  // 2. Stepped Profit Lock (1.5 ATR -> +0.5, 2.0 ATR -> +1.0, 3.0 ATR -> +2.0)
+                  // 2. Stepped Profit Lock (Fast Multi-Tier: 0.35 ATR, 0.6 ATR, 1.5 ATR, 2.0 ATR, 3.0 ATR)
                   if(!spread_frozen && UseSteppedProfitLock && live_atr>0.0)
                     {
                      double gain=p_tick.bid-open_price;
@@ -343,12 +343,16 @@ void GSProcess(const bool evaluate_signal)
                         if(gain_atr>=3.0) locked_profit=2.5*live_atr;
                         else if(gain_atr>=2.0) locked_profit=1.5*live_atr;
                         else if(gain_atr>=1.5) locked_profit=1.0*live_atr;
+                        else if(gain_atr>=0.6) locked_profit=0.35*live_atr;
+                        else if(gain_atr>=0.35) locked_profit=0.05*live_atr;
                        }
                      else
                        {
                         if(gain_atr>=3.0) locked_profit=2.0*live_atr;
                         else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
                         else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                        else if(gain_atr>=0.6) locked_profit=0.25*live_atr;
+                        else if(gain_atr>=0.35) locked_profit=0.05*live_atr;
                        }
                      if(locked_profit>0.0)
                        {
@@ -396,7 +400,7 @@ void GSProcess(const bool evaluate_signal)
                           }
                        }
                     }
-                  // 2. Stepped Profit Lock (1.5 ATR -> +0.5, 2.0 ATR -> +1.0, 3.0 ATR -> +2.0)
+                  // 2. Stepped Profit Lock (Fast Multi-Tier: 0.35 ATR, 0.6 ATR, 1.5 ATR, 2.0 ATR, 3.0 ATR)
                   if(!spread_frozen && UseSteppedProfitLock && live_atr>0.0)
                     {
                      double gain=open_price-p_tick.ask;
@@ -407,12 +411,16 @@ void GSProcess(const bool evaluate_signal)
                         if(gain_atr>=3.0) locked_profit=2.5*live_atr;
                         else if(gain_atr>=2.0) locked_profit=1.5*live_atr;
                         else if(gain_atr>=1.5) locked_profit=1.0*live_atr;
+                        else if(gain_atr>=0.6) locked_profit=0.35*live_atr;
+                        else if(gain_atr>=0.35) locked_profit=0.05*live_atr;
                        }
                      else
                        {
                         if(gain_atr>=3.0) locked_profit=2.0*live_atr;
                         else if(gain_atr>=2.0) locked_profit=1.0*live_atr;
                         else if(gain_atr>=1.5) locked_profit=0.5*live_atr;
+                        else if(gain_atr>=0.6) locked_profit=0.25*live_atr;
+                        else if(gain_atr>=0.35) locked_profit=0.05*live_atr;
                        }
                      if(locked_profit>0.0)
                        {
