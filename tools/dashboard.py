@@ -515,6 +515,153 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             position: relative;
         }
 
+        /* DECISION & EXPLANATION CARD */
+        .decision-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .decision-header {
+            padding: 10px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .decision-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .decision-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            letter-spacing: 0.3px;
+        }
+        .decision-badge.standby {
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid var(--border);
+        }
+        .decision-badge.active-trade {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+        .decision-symbol-pill {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--cyan);
+            background: #f0f9ff;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid #bae6fd;
+        }
+        .decision-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--mono);
+        }
+        .decision-body {
+            padding: 16px 18px;
+        }
+        .decision-main-row {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+        .decision-icon-large {
+            font-size: 28px;
+            line-height: 1;
+            padding-top: 2px;
+        }
+        .decision-content {
+            flex: 1;
+        }
+        .decision-heading {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+        .decision-explanation {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .decision-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+        }
+        .metric-pill {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .metric-lbl {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .metric-val {
+            font-size: 0.82rem;
+            color: var(--text-main);
+            font-family: var(--mono);
+        }
+        .trade-card {
+            background: #f0fdf4;
+            border: 1px solid var(--green-border);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            margin-top: 10px;
+        }
+        .trade-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .trade-card-title {
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: var(--green);
+        }
+        .trade-card-reason {
+            font-size: 0.82rem;
+            color: var(--text-main);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .trade-guards-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            font-size: 0.74rem;
+        }
+        .trade-guard-item {
+            background: #ffffff;
+            padding: 5px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--green-border);
+        }
+
         /* FOOTER */
         footer {
             margin-top: 24px;
@@ -565,6 +712,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             .chart-header {
                 padding: 10px 14px;
             }
+            .decision-metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .trade-guards-grid {
+                grid-template-columns: 1fr;
+            }
+            .decision-body {
+                padding: 12px 14px;
+            }
             .banner-title { font-size: 0.86rem; }
             .banner-text { font-size: 0.78rem; }
             .tabs-header {
@@ -606,14 +762,53 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </header>
 
-        <!-- STATUS EXPLANATION BANNER (Alasan Posisi 0 / Status Terkini) -->
-        <div class="status-banner" id="status-banner">
-            <div class="banner-icon">ℹ️</div>
-            <div class="banner-body">
-                <div class="banner-title" id="banner-title">Status Trading: Standby Menunggu Sinyal Valid</div>
-                <div class="banner-text" id="banner-text">
-                    Robot sedang memantau chart secara real-time. Menjaga modal dan otomatis membuka posisi baru saat candle penutupan berikutnya menembus tren terkonfirmasi.
+        <!-- KOTAK INFORMASI & ALASAN KEPUTUSAN ROBOT -->
+        <div class="decision-card" id="decision-card">
+            <div class="decision-header">
+                <div class="decision-title-group">
+                    <span class="decision-badge standby" id="decision-badge">🟢 STANDBY (0 POSISI)</span>
+                    <span class="decision-symbol-pill" id="decision-symbol-pill">XAUUSDm (M15)</span>
                 </div>
+                <div class="decision-time" id="decision-time">
+                    Candle M15 Terakhir: --:-- Server
+                </div>
+            </div>
+
+            <div class="decision-body">
+                <div class="decision-main-row">
+                    <div class="decision-icon-large" id="decision-icon">🔍</div>
+                    <div class="decision-content">
+                        <div class="decision-heading" id="decision-heading">
+                            Status Trading: Standby Menunggu Sinyal Valid
+                        </div>
+                        <div class="decision-explanation" id="decision-explanation">
+                            Robot sedang memantau chart secara real-time. Menjaga modal dan otomatis membuka posisi baru saat candle penutupan berikutnya menembus tren terkonfirmasi.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- METRIK INDIKATOR TEKNIKAL REALTIME (Saat Standby) -->
+                <div class="decision-metrics-grid" id="decision-metrics-grid">
+                    <div class="metric-pill">
+                        <span class="metric-lbl">ADX (Tren >20)</span>
+                        <strong class="metric-val" id="dec-adx">-</strong>
+                    </div>
+                    <div class="metric-pill">
+                        <span class="metric-lbl">RSI Momentum (14)</span>
+                        <strong class="metric-val" id="dec-rsi">-</strong>
+                    </div>
+                    <div class="metric-pill">
+                        <span class="metric-lbl">ATR Volatilitas</span>
+                        <strong class="metric-val" id="dec-atr">-</strong>
+                    </div>
+                    <div class="metric-pill">
+                        <span class="metric-lbl">Posisi Harga Relatif</span>
+                        <strong class="metric-val" id="dec-ema-rel">-</strong>
+                    </div>
+                </div>
+
+                <!-- DETAIL POSISI AKTIF (Tampil otomatis saat posisi > 0) -->
+                <div class="active-trades-container" id="active-trades-container" style="display:none;"></div>
             </div>
         </div>
 
@@ -892,6 +1087,116 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        const REASON_DICT = {
+            'HOLD_RULES_NO_SETUP': {
+                title: 'Belum Terbentuk Pola Crossover Baru',
+                desc: 'Kondisi indikator tren belum membentuk persilangan (crossover) baru yang valid antara EMA 20 dan EMA 50. Robot sengaja menahan diri agar tidak masuk di tengah pergerakan harga tanpa sinyal awal yang kuat.',
+                icon: '⏳'
+            },
+            'HOLD_ADX_SIDEWAYS': {
+                title: 'Pasar Sideways / Datar (ADX < 20)',
+                desc: 'Kekuatan tren pasar sedang lemah di bawah ambang batas minimal (ADX < 20.0). Robot menahan transaksi untuk melindungi saldo dari ayunan harga tanpa arah (whipsaw).',
+                icon: '💤'
+            },
+            'HOLD_ADX_MOMENTUM_FALLING': {
+                title: 'Momentum Tren Sedang Melandai / Melemah',
+                desc: 'Nilai indikator kekuatan tren (ADX) pada lilin penutupan terpantau turun dibandingkan lilin sebelumnya. Robot menunggu momentum tren kembali menanjak.',
+                icon: '📉'
+            },
+            'HOLD_HTF_TREND_BEARISH': {
+                title: 'Bertentangan dengan Tren Besar H1 (Bearish)',
+                desc: 'Sinyal beli M15 ditolak karena tren timeframe 1 Jam (H1) sedang menurun. Robot disiplin hanya mengambil posisi searah dengan tren institusi.',
+                icon: '🛡️'
+            },
+            'HOLD_HTF_TREND_BULLISH': {
+                title: 'Bertentangan dengan Tren Besar H1 (Bullish)',
+                desc: 'Sinyal jual M15 ditolak karena tren timeframe 1 Jam (H1) sedang menaik. Robot disiplin hanya mengambil posisi searah dengan tren institusi.',
+                icon: '🛡️'
+            },
+            'HOLD_HTF_SLOPE_FLAT': {
+                title: 'Kemiringan Sudut Tren H1 Kurang Tajam',
+                desc: 'Sudut pergerakan EMA H1 masih relatif datar. Robot menunggu momentum arah yang lebih tegas sebelum mengambil risiko modal.',
+                icon: '📐'
+            },
+            'HOLD_CANDLE_BULLISH': {
+                title: 'Warna Candle M15 Menutup Hijau (Bullish)',
+                desc: 'Sinyal SELL memerlukan konfirmasi candle penutupan merah. Karena lilin M15 ditutup hijau, robot menunda eksekusi order.',
+                icon: '🕯️'
+            },
+            'HOLD_CANDLE_BEARISH': {
+                title: 'Warna Candle M15 Menutup Merah (Bearish)',
+                desc: 'Sinyal BUY memerlukan konfirmasi candle penutupan hijau. Karena lilin M15 ditutup merah, robot menunda eksekusi order.',
+                icon: '🕯️'
+            },
+            'HOLD_CANDLE_BODY_TOO_SMALL': {
+                title: 'Badan Lilin M15 Terlalu Tipis (Doji/Ragu)',
+                desc: 'Ukuran badan candle penutupan kurang dari 40% dari total tinggi candle. Menandakan ketidakpastian pasar, berisiko pembalikan arah instan.',
+                icon: '⚖️'
+            },
+            'HOLD_CANDLE_LOWER_WICK_REJECTION': {
+                title: 'Penolakan Harga Bawah (Rejection Wick)',
+                desc: 'Lilin memiliki ekor bawah yang terlalu panjang (terjadi perlawanan beli kuat). Berbahaya untuk melakukan penjualan.',
+                icon: '⚠️'
+            },
+            'HOLD_CANDLE_UPPER_WICK_REJECTION': {
+                title: 'Penolakan Harga Atas (Rejection Wick)',
+                desc: 'Lilin memiliki ekor atas yang terlalu panjang (terjadi tekanan jual kuat). Berbahaya untuk melakukan pembelian.',
+                icon: '⚠️'
+            },
+            'HOLD_LOW_TICK_VOLUME': {
+                title: 'Volume Transaksi Tick Terlalu Rendah',
+                desc: 'Aktivitas volume pasar berada di bawah 75% dari rata-rata 5 candle terakhir. Likuiditas tipis rawan pelebaran spread broker.',
+                icon: '📊'
+            },
+            'HOLD_PRICE_OVEREXTENDED': {
+                title: 'Harga Terlalu Jauh dari Rata-Rata (Overextended)',
+                desc: 'Jarak harga saat ini sudah merenggang lebih dari 1.8 ATR dari garis EMA. Menghindari risiko beli di pucuk atau jual di dasar lembah.',
+                icon: '🛑'
+            },
+            'HOLD_NEWS_VOLATILITY_SURGE': {
+                title: 'Lonjakan Volatilitas Ekstrim (Berita/Flash Move)',
+                desc: 'Rentang candle penutupan melebihi 2.5x ATR normal. Robot memblokir order untuk menyelamatkan modal dari goncangan liar pasar.',
+                icon: '⚡'
+            },
+            'HOLD_SESSION_FILTER_CLOSED': {
+                title: 'Di Luar Jam Sesi Utama Emas (07:00–21:00 Server)',
+                desc: 'Bursa Emas berada di luar jam likuiditas tertinggi London & New York. Robot standby guna menghindari spread malam broker yang tinggi.',
+                icon: '🌙'
+            },
+            'HOLD_WEEKLY_OPEN_STABILIZATION': {
+                title: 'Masa Stabilisasi Pembukaan Bursa Senin',
+                desc: 'Jeda 30 menit awal pembukaan pasar Senin (00:00–00:30 server) untuk menghindari risiko gap harga dan spread pembukaan.',
+                icon: '🌅'
+            },
+            'HOLD_DAILY_PROFIT_TARGET_REACHED': {
+                title: 'Target Profit Harian Tercapai (+2%)',
+                desc: 'Target akumulasi keuntungan harian telah tercapai. Robot mengunci laba dan berhenti trading hingga pergantian hari berikutnya.',
+                icon: '🏆'
+            },
+            'HOLD_SPREAD_ATR_EXCESSIVE': {
+                title: 'Spread Broker Sedang Melebar',
+                desc: 'Selisih harga Bid/Ask sedang melebihi 30% ATR. Robot menunggu spread broker kembali ke kondisi rapat yang efisien.',
+                icon: '↔️'
+            },
+            'WAIT_NEXT_CLOSED_BAR': {
+                title: 'Menunggu Lilin M15 Selesai Ditutup',
+                desc: 'Robot mengevaluasi sinyal secara disiplin hanya saat lilin 15 menit ditutup sempurna (menit :00, :15, :30, :45). Sedang mengamati formasi lilin berjalan.',
+                icon: '⏱️'
+            }
+        };
+
+        function getReasonInfo(reasonCode) {
+            if (!reasonCode) return REASON_DICT['WAIT_NEXT_CLOSED_BAR'];
+            for (const [key, val] of Object.entries(REASON_DICT)) {
+                if (reasonCode.includes(key)) return val;
+            }
+            return {
+                title: `Menunggu Konfirmasi Sinyal`,
+                desc: `Robot sedang mengamati pasar dan menunggu seluruh filter teknikal M15/H1 terpenuhi sebelum membuka posisi.`,
+                icon: 'ℹ️'
+            };
+        }
+
         function renderDashboard(data) {
             const s = data.summary || {};
 
@@ -930,9 +1235,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById('count-deals').textContent = (data.deals || []).length;
             document.getElementById('count-audit').textContent = (data.audit || []).length;
 
-            // 2. Banner Status Update
-            const bannerTitle = document.getElementById('banner-title');
-            const bannerText = document.getElementById('banner-text');
+            // 2. Decision Card & Explanation Update
             const headerStatus = document.getElementById('header-status');
             const activeSym = s.active_symbol || 'XAUUSDm';
 
@@ -944,25 +1247,102 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
+            const dec = data.market_decision || {};
+            const decBadge = document.getElementById('decision-badge');
+            const decSymPill = document.getElementById('decision-symbol-pill');
+            const decTime = document.getElementById('decision-time');
+            const decIcon = document.getElementById('decision-icon');
+            const decHeading = document.getElementById('decision-heading');
+            const decExplanation = document.getElementById('decision-explanation');
+            const decMetricsGrid = document.getElementById('decision-metrics-grid');
+            const activeTradesBox = document.getElementById('active-trades-container');
+
+            if (decSymPill) decSymPill.textContent = `${activeSym} (M15)`;
+            if (decTime) decTime.textContent = dec.bar_time ? `Evaluasi Lilin Terakhir: ${dec.bar_time} Server` : `Server Running: Real-Time`;
+
             if (pos.length > 0) {
                 headerStatus.textContent = `TRADING AKTIF • ${pos.length} POSISI`;
-                bannerTitle.textContent = `🚀 Posisi Aktif Berjalan (${pos.length} Order)`;
-                bannerText.innerHTML = `Order sedang aktif di pasar <strong>${activeSym}</strong> dan dipantau pengaman Trailing Stop, Stepped Lock, serta Take Profit 50%. Floating saat ini: <strong>${formatProfit(totalFloating)}</strong>.`;
+                if (decBadge) {
+                    decBadge.className = 'decision-badge active-trade';
+                    decBadge.textContent = `🚀 POSISI AKTIF (${pos.length} ORDER)`;
+                }
+                if (decIcon) decIcon.textContent = '🔥';
+                if (decHeading) decHeading.textContent = `Order Terbuka Sedang Berjalan di Pasar ${activeSym}`;
+                if (decExplanation) decExplanation.innerHTML = `Robot telah mengonfirmasi sinyal tren valid dan membuka posisi. Manajemen risiko Stop Loss dan pengaman profit berjalan otomatis. Floating saat ini: <strong>${formatProfit(totalFloating)}</strong>.`;
+                
+                if (decMetricsGrid) decMetricsGrid.style.display = 'none';
+                if (activeTradesBox) {
+                    activeTradesBox.style.display = 'block';
+                    let tradesHtml = '';
+                    pos.forEach(p => {
+                        const isBuy = (p.type || '').toUpperCase() === 'BUY';
+                        const typeColor = isBuy ? 'var(--green)' : 'var(--red)';
+                        const typeBg = isBuy ? '#f0fdf4' : '#fef2f2';
+                        const typeBorder = isBuy ? 'var(--green-border)' : 'var(--red-border)';
+
+                        const reasonText = isBuy 
+                            ? `Sinyal <strong>BUY</strong> diambil karena candle M15 menembus EMA ke atas (Golden Cross), didukung tren H1 Bullish, ADX > 20 menanjak, dan candle penutupan hijau kuat.`
+                            : `Sinyal <strong>SELL</strong> diambil karena candle M15 menembus EMA ke bawah (Death Cross), didukung tren H1 Bearish, ADX > 20 menanjak, dan candle penutupan merah kuat.`;
+
+                        tradesHtml += `
+                        <div class="trade-card" style="background:${typeBg}; border-color:${typeBorder};">
+                            <div class="trade-card-header">
+                                <span class="trade-card-title" style="color:${typeColor};">
+                                    ${isBuy ? '🟢' : '🔴'} ${p.type} ${p.volume} Lot • Tiket #${p.ticket}
+                                </span>
+                                <span class="mono" style="font-weight:700; color:${parseFloat(p.profit) >= 0 ? 'var(--green)' : 'var(--red)'};">
+                                    Floating: ${formatProfit(p.profit)}
+                                </span>
+                            </div>
+                            <div class="trade-card-reason">
+                                <strong>Alasan Entri:</strong> ${reasonText}
+                            </div>
+                            <div class="trade-guards-grid">
+                                <div class="trade-guard-item"><strong>Harga Masuk:</strong> ${p.open_price}</div>
+                                <div class="trade-guard-item"><strong>Harga Saat Ini:</strong> ${p.current_price}</div>
+                                <div class="trade-guard-item"><strong>Stop Loss:</strong> ${p.sl || '2.0 ATR'}</div>
+                                <div class="trade-guard-item"><strong>TP1 (50%):</strong> ${p.tp || '1.5 ATR'}</div>
+                                <div class="trade-guard-item"><strong>Trailing Stop:</strong> Aktif Terpasang</div>
+                                <div class="trade-guard-item"><strong>Break-Even Lock:</strong> +0.2 ATR Kunci Modal</div>
+                            </div>
+                        </div>`;
+                    });
+                    activeTradesBox.innerHTML = tradesHtml;
+                }
             } else {
                 headerStatus.textContent = 'STANDBY • WAIT CANDLE';
-                const reason = s.core_reason || '';
-                if (reason.includes('ADX_SIDEWAYS')) {
-                    bannerTitle.textContent = 'Status: Standby Menunggu Momentum Tren (Filter Sideways Aktif)';
-                    bannerText.innerHTML = `Robot mendeteksi pasar <strong>${activeSym}</strong> sedang bergerak sideways/datar (ADX < 20). Robot menahan diri agar tidak terjebak sinyal palsu, dan siap masuk saat tren kuat terbentuk.`;
-                } else if (reason.includes('HTF_TREND')) {
-                    bannerTitle.textContent = 'Status: Standby Menunggu Konfirmasi Tren Lebih Besar (H1)';
-                    bannerText.innerHTML = `Sinyal M15 <strong>${activeSym}</strong> menunggu keselarasan tren H1 untuk memastikan probabilitas menang tinggi. Modal aman terlindungi.`;
-                } else if (reason.includes('SESSION_FILTER')) {
-                    bannerTitle.textContent = `Status: Standby Di Luar Jadwal Sesi Utama (${activeSym})`;
-                    bannerText.innerHTML = `Robot menunggu jendela sesi likuiditas tinggi (London & New York, 07:00–21:00 server). Modal aman dari spread malam.`;
-                } else {
-                    bannerTitle.textContent = `Status Trading: Standby Menunggu Sinyal Valid (${activeSym})`;
-                    bannerText.innerHTML = `Robot sedang aktif memantau chart <strong>${activeSym} (M15)</strong> secara real-time. Sinyal baru dievaluasi setiap kali candle 15 menit selesai tutup.`;
+                if (decBadge) {
+                    decBadge.className = 'decision-badge standby';
+                    decBadge.textContent = '🟢 STANDBY (0 POSISI)';
+                }
+                if (activeTradesBox) activeTradesBox.style.display = 'none';
+                if (decMetricsGrid) decMetricsGrid.style.display = 'grid';
+
+                const rsn = dec.reason || s.core_reason || 'WAIT_NEXT_CLOSED_BAR';
+                const info = getReasonInfo(rsn);
+
+                if (decIcon) decIcon.textContent = info.icon;
+                if (decHeading) decHeading.textContent = `${info.title} (${rsn})`;
+                if (decExplanation) decExplanation.innerHTML = info.desc;
+
+                // Update metrik teknikal
+                const elAdx = document.getElementById('dec-adx');
+                const elRsi = document.getElementById('dec-rsi');
+                const elAtr = document.getElementById('dec-atr');
+                const elEma = document.getElementById('dec-ema-rel');
+
+                if (elAdx) elAdx.textContent = dec.adx !== '-' ? `${parseFloat(dec.adx).toFixed(1)}` : '-';
+                if (elRsi) elRsi.textContent = dec.rsi !== '-' ? `${parseFloat(dec.rsi).toFixed(1)}` : '-';
+                if (elAtr) elAtr.textContent = dec.atr !== '-' ? `${parseFloat(dec.atr).toFixed(2)}` : '-';
+                
+                if (elEma) {
+                    let emaRel = '-';
+                    if (dec.close !== '-' && dec.fast_ema !== '-') {
+                        const c = parseFloat(dec.close);
+                        const f = parseFloat(dec.fast_ema);
+                        emaRel = c > f ? 'Di Atas EMA (Bull)' : 'Di Bawah EMA (Bear)';
+                    }
+                    elEma.textContent = emaRel;
                 }
             }
 
@@ -1203,8 +1583,8 @@ def get_latest_data():
 
     # 5. Parse latest GS2.*.csv for audit logs
     audit_files = list(DATA_DIR.glob("GS2.*.csv"))
-    if audit_files:
-        latest_audit = max(audit_files, key=lambda p: p.stat().st_mtime)
+    latest_audit = max(audit_files, key=lambda p: p.stat().st_mtime) if audit_files else None
+    if latest_audit:
         try:
             with open(latest_audit, "r", encoding="utf-8", errors="ignore") as f:
                 reader = csv.reader(f)
@@ -1223,6 +1603,49 @@ def get_latest_data():
                     data["audit"] = audit_items[:60]
         except Exception:
             pass
+
+    # 6. Extract latest signal evaluation & technical indicators
+    market_decision = {
+        "bar_time": "",
+        "reason": data["summary"].get("core_reason", "WAIT_NEXT_CLOSED_BAR"),
+        "symbol": data["summary"].get("active_symbol", "XAUUSDm"),
+        "rsi": "-",
+        "adx": "-",
+        "atr": "-",
+        "close": "-",
+        "fast_ema": "-",
+        "slow_ema": "-",
+        "htf_fast": "-",
+        "htf_slow": "-"
+    }
+
+    if latest_audit:
+        try:
+            with open(latest_audit, "r", encoding="utf-8", errors="ignore") as f:
+                r_rows = list(csv.reader(f))
+                for row in reversed(r_rows):
+                    if len(row) > 7 and row[4] == "SIGNAL":
+                        market_decision["bar_time"] = row[2]
+                        market_decision["reason"] = row[7]
+                        details = row[8] if len(row) > 8 else ""
+
+                        def parse_metric(key):
+                            m = re.search(rf"\b{key}=([0-9.]+)", details)
+                            return m.group(1) if m else "-"
+
+                        market_decision["close"] = parse_metric("close")
+                        market_decision["rsi"] = parse_metric("rsi")
+                        market_decision["adx"] = parse_metric("adx")
+                        market_decision["atr"] = parse_metric("atr")
+                        market_decision["fast_ema"] = parse_metric("fast")
+                        market_decision["slow_ema"] = parse_metric("slow")
+                        market_decision["htf_fast"] = parse_metric("htf_fast")
+                        market_decision["htf_slow"] = parse_metric("htf_slow")
+                        break
+        except Exception:
+            pass
+
+    data["market_decision"] = market_decision
 
     return data
 
