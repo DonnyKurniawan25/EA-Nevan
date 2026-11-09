@@ -662,6 +662,120 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid var(--green-border);
         }
 
+        /* RULE CHECKLIST CARD */
+        .rules-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .rules-header {
+            padding: 12px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .rules-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--navy);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .rules-summary-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #eff6ff;
+            color: var(--primary);
+            border: 1px solid #bfdbfe;
+        }
+        .rules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 10px;
+            padding: 16px;
+        }
+        .rule-item {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .rule-item.pass {
+            border-left: 4px solid var(--green);
+            background: #fafdfb;
+        }
+        .rule-item.fail {
+            border-left: 4px solid var(--amber);
+            background: #fffdfa;
+        }
+        .rule-item.block {
+            border-left: 4px solid var(--red);
+            background: #fefcfc;
+        }
+        .rule-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .rule-name {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .rule-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+        }
+        .rule-badge.pass {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+        .rule-badge.fail {
+            background: #fef3c7;
+            color: #b45309;
+            border: 1px solid #fde68a;
+        }
+        .rule-badge.block {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .rule-condition {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+        .rule-current {
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px dashed var(--border);
+            padding-top: 5px;
+            margin-top: 2px;
+        }
+
         /* FOOTER */
         footer {
             margin-top: 24px;
@@ -717,6 +831,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
             .trade-guards-grid {
                 grid-template-columns: 1fr;
+            }
+            .rules-grid {
+                grid-template-columns: 1fr;
+                padding: 12px;
+                gap: 8px;
             }
             .decision-body {
                 padding: 12px 14px;
@@ -809,6 +928,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 <!-- DETAIL POSISI AKTIF (Tampil otomatis saat posisi > 0) -->
                 <div class="active-trades-container" id="active-trades-container" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- CHECKLIST EVALUASI SEMUA ATURAN & FILTER TRADING -->
+        <div class="rules-card" id="rules-card">
+            <div class="rules-header">
+                <div class="rules-title">
+                    <span>📋</span>
+                    <span>Evaluasi Semua Aturan & Syarat Trading (15 Rules)</span>
+                </div>
+                <div class="rules-summary-badge" id="rules-summary-badge">
+                    Memuat Evaluasi...
+                </div>
+            </div>
+            <div class="rules-grid" id="rules-grid">
+                <!-- Diisi otomatis oleh JavaScript -->
             </div>
         </div>
 
@@ -1212,6 +1347,199 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             };
         }
 
+        function renderRulesChecklist(data) {
+            const dec = data.market_decision || {};
+            const rsn = dec.reason || '';
+            const s = data.summary || {};
+            const activeTrades = data.positions || [];
+            const isTradeActive = activeTrades.length > 0;
+            const activeSym = s.active_symbol || dec.symbol || 'XAUUSDm';
+            const isCrypto = activeSym.toUpperCase().includes('BTC');
+
+            const adxVal = parseFloat(dec.adx) || 0;
+            const rsiVal = parseFloat(dec.rsi) || 50;
+            const atrVal = parseFloat(dec.atr) || 0;
+            const closeVal = parseFloat(dec.close) || 0;
+            const fastEma = parseFloat(dec.fast_ema) || 0;
+            const slowEma = parseFloat(dec.slow_ema) || 0;
+            const htfFast = parseFloat(dec.htf_fast) || 0;
+            const htfSlow = parseFloat(dec.htf_slow) || 0;
+
+            let serverHour = -1;
+            if (dec.bar_time) {
+                const parts = dec.bar_time.split(' ');
+                if (parts.length > 1) {
+                    const timeParts = parts[1].split(':');
+                    serverHour = parseInt(timeParts[0], 10);
+                }
+            }
+
+            const isSessionPass = isTradeActive || isCrypto || (serverHour >= 7 && serverHour < 21);
+            let sessionStatus = 'pass';
+            let sessionText = 'MEMENUHI ✅ (Sesi Aktif 07-21)';
+            if (isCrypto) {
+                sessionText = 'MEMENUHI ✅ (Kripto Buka 24/7)';
+            } else if (!isSessionPass) {
+                sessionStatus = rsn === 'HOLD_SESSION_FILTER_CLOSED' ? 'block' : 'fail';
+                sessionText = serverHour >= 0 && serverHour < 7 ? 'BELUM BUKA ⏳ (Jam 07:00)' : 'SESI TUTUP 🌙';
+            }
+
+            const rules = [
+                {
+                    id: 'session',
+                    name: '1. Sesi Jam Bursa Likuiditas (07:00–21:00)',
+                    condition: 'Menghindari jam sepi likuiditas malam / subuh broker untuk memangkas pelebaran spread.',
+                    current: isCrypto ? 'Pasar Kripto 24/7' : (serverHour >= 0 ? `Jam Server: ${serverHour.toString().padStart(2, '0')}:xx (Sesi Utama: 07:00–21:00)` : 'Mengikuti server broker'),
+                    status: sessionStatus,
+                    badgeText: sessionText
+                },
+                {
+                    id: 'adx_sideways',
+                    name: '2. Kekuatan Tren Pasar (ADX >= 20.0)',
+                    condition: 'Melindungi modal dari pasar flat / sideways tanpa arah.',
+                    current: `Nilai ADX Lilin: ${adxVal > 0 ? adxVal.toFixed(2) : '-'} (Ambang Batas Min: 20.0)`,
+                    status: isTradeActive || (adxVal >= 20.0 && rsn !== 'HOLD_ADX_SIDEWAYS') ? 'pass' : 'block',
+                    badgeText: (adxVal >= 20.0 && rsn !== 'HOLD_ADX_SIDEWAYS') ? 'MEMENUHI ✅ (Tren Kuat)' : 'TIDAK MEMENUHI ❌ (Sideways)'
+                },
+                {
+                    id: 'adx_momentum',
+                    name: '3. Momentum Tren Menanjak (Rising ADX)',
+                    condition: 'Kekuatan tren pada candle penutupan tidak boleh melemah / melandai turun.',
+                    current: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'ADX lilin terpantau melandai turun' : 'Momentum tren kokoh menanjak',
+                    status: isTradeActive || rsn !== 'HOLD_ADX_MOMENTUM_FALLING' ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_ADX_MOMENTUM_FALLING' ? 'BELUM MEMENUHI ⏳ (Melandai)' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'htf_trend',
+                    name: '4. Keselarasan Tren Besar H1 (Multi-Timeframe)',
+                    condition: 'Order wajib searah dengan tren institusi H1 (H1 Close & Fast > Slow EMA).',
+                    current: htfFast > 0 ? `H1 Fast: ${htfFast.toFixed(2)} | Slow: ${htfSlow.toFixed(2)} (Bullish)` : 'Sesuai tren H1',
+                    status: isTradeActive || (!rsn.includes('HOLD_HTF_TREND')) ? 'pass' : 'block',
+                    badgeText: rsn.includes('HOLD_HTF_TREND') ? 'BERTENTANGAN ❌' : 'MEMENUHI ✅ (Searah H1)'
+                },
+                {
+                    id: 'htf_slope',
+                    name: '5. Sudut Kemiringan Tren H1 (Slope Alignment)',
+                    condition: 'Sudut pergerakan garis EMA H1 harus menanjak tegas, bukan mendatar.',
+                    current: rsn.includes('HOLD_HTF_SLOPE') ? 'Sudut EMA H1 mendatar/kurang tajam' : 'Sudut EMA H1 menanjak tegas',
+                    status: isTradeActive || (!rsn.includes('HOLD_HTF_SLOPE')) ? 'pass' : 'block',
+                    badgeText: rsn.includes('HOLD_HTF_SLOPE') ? 'BELUM MEMENUHI ⏳ (Mendatar)' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'candle_dir',
+                    name: '6. Arah Warna Lilin M15 (Candle Momentum)',
+                    condition: 'Sinyal BUY wajib lilin hijau, sinyal SELL wajib lilin merah.',
+                    current: rsn === 'HOLD_CANDLE_BEARISH' ? 'Lilin M15 merah (Menunggu pantulan hijau)' : (rsn === 'HOLD_CANDLE_BULLISH' ? 'Lilin M15 hijau (Menunggu merah)' : 'Warna lilin M15 selaras tren'),
+                    status: isTradeActive || (rsn !== 'HOLD_CANDLE_BEARISH' && rsn !== 'HOLD_CANDLE_BULLISH') ? 'pass' : 'fail',
+                    badgeText: (rsn === 'HOLD_CANDLE_BEARISH' || rsn === 'HOLD_CANDLE_BULLISH') ? 'BELUM MEMENUHI ⏳ (Warna Koreksi)' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'candle_body',
+                    name: '7. Bobot Badan Lilin M15 (Min Body >= 40%)',
+                    condition: 'Menolak candle doji / lilin banci tanpa komitmen di area sempit.',
+                    current: rsn === 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'Badan lilin < 40% (Doji/ragu-ragu)' : 'Badan lilin proporsional & solid',
+                    status: isTradeActive || rsn !== 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_CANDLE_BODY_TOO_SMALL' ? 'TIDAK MEMENUHI ❌ (Doji Tipis)' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'wick_reject',
+                    name: '8. Penolakan Ekor Lilin (Wick Rejection Guard)',
+                    condition: 'Tidak ada perlawanan ekor panjang berlawanan arah sinyal.',
+                    current: rsn.includes('WICK_REJECTION') ? 'Terdeteksi perlawanan ekor penolakan' : 'Aman dari penolakan ekor berlawanan',
+                    status: isTradeActive || (!rsn.includes('WICK_REJECTION')) ? 'pass' : 'block',
+                    badgeText: rsn.includes('WICK_REJECTION') ? 'TIDAK MEMENUHI ⚠️ (Ekor Panjang)' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'tick_volume',
+                    name: '9. Volume Transaksi Tick (Min 75% Rata-Rata)',
+                    condition: 'Aktivitas pasar harus aktif (volume tick >= 0.75x rata-rata 5 candle).',
+                    current: rsn === 'HOLD_LOW_TICK_VOLUME' ? 'Volume tick di bawah 75% rata-rata 5 lilin' : 'Aktivitas volume normal / tinggi',
+                    status: isTradeActive || rsn !== 'HOLD_LOW_TICK_VOLUME' ? 'pass' : 'fail',
+                    badgeText: rsn === 'HOLD_LOW_TICK_VOLUME' ? 'BELUM MEMENUHI ⏳ (Volume Sepi)' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'price_stretch',
+                    name: '10. Jarak Peregangan Harga (Stretch <= 1.8 ATR)',
+                    condition: 'Mencegah beli di pucuk tertinggi atau jual di lembah terdalam.',
+                    current: rsn === 'HOLD_PRICE_OVEREXTENDED' ? 'Jarak harga merenggang > 1.8 ATR dari EMA' : 'Jarak harga wajar & aman dari pucuk',
+                    status: isTradeActive || rsn !== 'HOLD_PRICE_OVEREXTENDED' ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_PRICE_OVEREXTENDED' ? 'TIDAK MEMENUHI 🛑 (Overextended)' : 'MEMENUHI ✅ (Anti-Pucuk)'
+                },
+                {
+                    id: 'news_surge',
+                    name: '11. Filter Volatilitas Ekstrim (News <= 2.5 ATR)',
+                    condition: 'Memblokir order saat lonjakan liar berita tak terkendali.',
+                    current: rsn === 'HOLD_NEWS_VOLATILITY_SURGE' ? 'Terjadi lonjakan candle > 2.5x ATR' : 'Volatilitas stabil terkendali',
+                    status: isTradeActive || rsn !== 'HOLD_NEWS_VOLATILITY_SURGE' ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_NEWS_VOLATILITY_SURGE' ? 'BLOKIR BERITA ⚡' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'spread_atr',
+                    name: '12. Toleransi Spread Broker (Spread <= 0.30 ATR)',
+                    condition: 'Menolak order saat broker melebarkan spread di atas batas wajar.',
+                    current: rsn === 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'Spread broker melebar di atas 30% ATR' : 'Spread broker rapat & hemat biaya',
+                    status: isTradeActive || rsn !== 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_SPREAD_ATR_EXCESSIVE' ? 'SPREAD MELEBAR ↔️' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'midnight_rollover',
+                    name: '13. Proteksi Rollover Malam (23:55–00:15 Broker)',
+                    condition: 'Blokir entri saat pergantian hari untuk hindari lonjakan spread & swap.',
+                    current: rsn === 'HOLD_MIDNIGHT_ROLLOVER' ? 'Sedang jam rollover pergantian hari' : 'Di luar jam rollover tengah malam',
+                    status: isTradeActive || rsn !== 'HOLD_MIDNIGHT_ROLLOVER' ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_MIDNIGHT_ROLLOVER' ? 'ROLLOVER MALAM 🌙' : 'MEMENUHI ✅'
+                },
+                {
+                    id: 'daily_quota',
+                    name: '14. Batas Kuota Transaksi Harian (Maks 3-10 Entri)',
+                    condition: 'Mencegah overtrading berlebih dan melindungi modal harian.',
+                    current: `Entri hari ini: ${s.entries_count || 0} / ${s.max_entries || 10}`,
+                    status: isTradeActive || (rsn !== 'HOLD_DAILY_ENTRY_LIMIT' && rsn !== 'HOLD_DAILY_PROFIT_TARGET_REACHED') ? 'pass' : 'block',
+                    badgeText: rsn === 'HOLD_DAILY_PROFIT_TARGET_REACHED' ? 'TARGET 2% TERCAPAI 🏆' : (rsn === 'HOLD_DAILY_ENTRY_LIMIT' ? 'KUOTA HABIS 🛑' : 'MEMENUHI ✅')
+                },
+                {
+                    id: 'setup_pattern',
+                    name: '15. Pola Multi-Setup (Pullback / Breakout / Cross)',
+                    condition: 'Wajib terkonfirmasi salah satu dari 3 setup teknikal konfluensi.',
+                    current: isTradeActive ? 'Posisi aktif berjalan' : (rsn.includes('CANDIDATE') ? 'Setup entri terkonfirmasi' : 'Menunggu lilin setup berikutnya'),
+                    status: isTradeActive || rsn.includes('CANDIDATE') ? 'pass' : (rsn === 'HOLD_RULES_NO_SETUP' ? 'fail' : 'pass'),
+                    badgeText: isTradeActive || rsn.includes('CANDIDATE') ? 'MEMENUHI ✅ (Setup Terbuka)' : 'BELUM ADA SETUP ⏳'
+                }
+            ];
+
+            let passCount = rules.filter(r => r.status === 'pass').length;
+            const summaryBadge = document.getElementById('rules-summary-badge');
+            if (summaryBadge) {
+                summaryBadge.textContent = `${passCount} / ${rules.length} Aturan Memenuhi`;
+                summaryBadge.style.background = passCount === rules.length ? '#dcfce7' : '#eff6ff';
+                summaryBadge.style.color = passCount === rules.length ? '#15803d' : '#1d4ed8';
+            }
+
+            const container = document.getElementById('rules-grid');
+            if (!container) return;
+
+            let html = '';
+            rules.forEach(r => {
+                const isPass = r.status === 'pass';
+                const itemClass = isPass ? 'pass' : (r.status === 'block' ? 'block' : 'fail');
+                const badgeClass = isPass ? 'pass' : (r.status === 'block' ? 'block' : 'fail');
+
+                html += `
+                <div class="rule-item ${itemClass}">
+                    <div class="rule-top">
+                        <span class="rule-name">${r.name}</span>
+                        <span class="rule-badge ${badgeClass}">${r.badgeText}</span>
+                    </div>
+                    <div class="rule-condition">${r.condition}</div>
+                    <div class="rule-current">
+                        <span style="color:var(--text-muted); font-size:0.7rem;">Kondisi Live:</span>
+                        <span>${r.current}</span>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
         function renderDashboard(data) {
             const s = data.summary || {};
 
@@ -1365,6 +1693,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     elEma.textContent = emaRel;
                 }
             }
+
+            // 2.5 Render Rules Checklist (15 Rules Realtime)
+            renderRulesChecklist(data);
 
             // 3. Render Positions Table
             const tbodyPos = document.getElementById('tbody-positions');
