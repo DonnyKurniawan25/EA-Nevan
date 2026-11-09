@@ -2272,9 +2272,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 },
                 {
                     id: 'daily_quota',
-                    name: '14. Batas Kuota Transaksi Harian (Maks 3-10 Entri)',
+                    name: '14. Batas Kuota Transaksi Harian (Maks 20 Entri)',
                     condition: 'Mencegah overtrading berlebih dan melindungi modal harian.',
-                    current: `Entri hari ini: ${s.entries_count || 0} / ${s.max_entries || 10}`,
+                    current: `Entri hari ini: ${s.entries_count || 0} / ${s.max_entries || 20}`,
                     status: isTradeActive || (rsn !== 'HOLD_DAILY_ENTRY_LIMIT' && rsn !== 'HOLD_DAILY_PROFIT_TARGET_REACHED') ? 'pass' : 'block',
                     badgeText: rsn === 'HOLD_DAILY_PROFIT_TARGET_REACHED' ? 'TARGET 2% TERCAPAI 🏆' : (rsn === 'HOLD_DAILY_ENTRY_LIMIT' ? 'KUOTA HABIS 🛑' : 'MEMENUHI ✅ (Pelindung Mutlak)'),
                     poin: 'Pelindung Mutlak'

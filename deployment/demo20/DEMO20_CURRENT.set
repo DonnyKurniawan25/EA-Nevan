@@ -30,6 +30,6 @@ MaxEntryStretchATR=1.0
 MaxDailyLossPct=0.03
 MaxWeeklyLossPct=0.075
 MaxConsecutiveLossesPerDay=2
-MaxEntriesPerDay=3
+MaxEntriesPerDay=20
 CapitalLimitUSD=0
 RequiredAccountCurrency=USD

@@ -125,9 +125,9 @@ input double MaxSpreadATRMultiple=0.30; // Toleransi spread maksimal (% dari ATR
 input double MaxDailyLossPct=0.5; // Account realized trading P/L, measured against persisted reference.
 input double MaxWeeklyLossPct=1.0;
 input int MaxConsecutiveLossesPerDay=2; // Owned, fully closed positions after all costs.
-input int MaxEntriesPerDay=3; // Unique owned positions; partial fills count once.
+input int MaxEntriesPerDay=20; // Unique owned positions; partial fills count once.
 input bool UseDynamicDailyQuota=true; // Kuota dinamis: terus jika untung/impas, batasi ketat jika rugi
-input int MaxDynamicEntriesPerDay=10; // Batas absolut entri per hari saat mode kuota dinamis
+input int MaxDynamicEntriesPerDay=20; // Batas absolut entri per hari saat mode kuota dinamis
 
 input group "FEATURE GATES - belum tersedia pada Phase 1"
 input bool GridEnabled=false;
@@ -165,7 +165,7 @@ bool GSValidateSettings(string &reason)
       return GSReject(reason,"INVALID_ADX_SETTINGS");
    if(!GSPositive(MaxDailyLossPct) || MaxDailyLossPct>1.0 ||
       !GSPositive(MaxWeeklyLossPct) || MaxWeeklyLossPct>2.0 || MaxDailyLossPct>MaxWeeklyLossPct ||
-      MaxConsecutiveLossesPerDay<1 || MaxEntriesPerDay<1 || MaxEntriesPerDay>20)
+      MaxConsecutiveLossesPerDay<1 || MaxEntriesPerDay<1 || MaxEntriesPerDay>50)
       return GSReject(reason,"INVALID_DAILY_WEEKLY_LIMITS");
    if(!GSPositive(BaseLot) || !GSPositive(StopATRMultiple) ||
       !GSPositive(RewardRiskMultiple) || !GSPositive(MaxCandleATRMultiple) ||
