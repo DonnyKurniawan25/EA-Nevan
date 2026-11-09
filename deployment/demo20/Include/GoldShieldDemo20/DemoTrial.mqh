@@ -125,7 +125,8 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
 
    // Telemetri live streaming real-time: tiap detik saat ada posisi, tiap 10 detik saat flat
    static datetime last_telemetry=0;
-   if(owned.count>0 || now-last_telemetry>=10)
+   int live_positions_count=PositionsTotal();
+   if(live_positions_count>0 || now-last_telemetry>=10)
      {
       last_telemetry=now;
       int acc_file=FileOpen("GoldShield\\account_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
@@ -135,21 +136,23 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
          FileWrite(acc_file,TimeToString(now,TIME_DATE|TIME_SECONDS),
                    DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE),2),
                    DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),2),
-                   AccountInfoString(ACCOUNT_CURRENCY),IntegerToString(owned.count));
+                   AccountInfoString(ACCOUNT_CURRENCY),IntegerToString(live_positions_count));
          FileFlush(acc_file); FileClose(acc_file);
         }
 
       int pos_file=FileOpen("GoldShield\\positions_live.csv",FILE_WRITE|FILE_CSV|FILE_ANSI,',');
       if(pos_file!=INVALID_HANDLE)
         {
-         FileWrite(pos_file,"ticket","symbol","type","volume","open_price","current_price","sl","tp","profit");
+         FileWrite(pos_file,"ticket","symbol","type","volume","open_price","current_price","sl","tp","profit","origin");
          for(int p=PositionsTotal()-1;p>=0;p--)
            {
             ulong pt=PositionGetTicket(p);
             if(pt>0 && PositionSelectByTicket(pt))
               {
-               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+               ulong pt_magic=(ulong)PositionGetInteger(POSITION_MAGIC);
+               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (pt_magic==MagicNumber || pt_magic==GS_MANUAL_MAGIC))
                  {
+                  string origin=(pt_magic==GS_MANUAL_MAGIC ? "MANUAL" : "ROBOT");
                   FileWrite(pos_file,IntegerToString(pt),
                             PositionGetString(POSITION_SYMBOL),
                             ((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? "BUY" : "SELL"),
@@ -158,7 +161,8 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
                             DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT),_Digits),
                             DoubleToString(PositionGetDouble(POSITION_SL),_Digits),
                             DoubleToString(PositionGetDouble(POSITION_TP),_Digits),
-                            DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2));
+                            DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2),
+                            origin);
                  }
               }
            }

@@ -2512,12 +2512,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let html = '';
                 pos.forEach(p => {
                     const isBuy = (p.type || '').toUpperCase() === 'BUY';
+                    const isManual = (p.origin || '').toUpperCase() === 'MANUAL';
+                    const originBadge = isManual
+                        ? `<span class="pill" style="background:#fef3c7; color:#92400e; font-size:0.65rem; font-weight:800; border:1px solid #fde68a;">👤 MANUAL</span>`
+                        : `<span class="pill" style="background:#e0e7ff; color:#3730a3; font-size:0.65rem; font-weight:800; border:1px solid #c7d2fe;">🤖 ROBOT</span>`;
                     const pnl = parseFloat(p.profit) || 0;
                     const pnlClass = pnl > 0 ? 'val-profit' : (pnl < 0 ? 'val-loss' : '');
                     html += `<tr>
                         <td class="mono">#${p.ticket}</td>
                         <td><strong>${p.symbol}</strong></td>
-                        <td><span class="pill ${isBuy ? 'pill-buy' : 'pill-sell'}">${p.type}</span></td>
+                        <td><span class="pill ${isBuy ? 'pill-buy' : 'pill-sell'}">${p.type}</span> ${originBadge}</td>
                         <td class="mono">${p.volume}</td>
                         <td class="mono">${p.open_price}</td>
                         <td class="mono">${p.current_price}</td>

@@ -127,22 +127,20 @@ void GSProcess(const bool evaluate_signal)
         }
       FileDelete("GoldShield\\MANUAL_CLOSE");
 
-      if(g_owned.count>0)
+      for(int i=PositionsTotal()-1;i>=0;i--)
         {
-         for(int i=PositionsTotal()-1;i>=0;i--)
+         ulong t=PositionGetTicket(i);
+         if(t==0 || !PositionSelectByTicket(t)) continue;
+         ulong pos_magic=(ulong)PositionGetInteger(POSITION_MAGIC);
+         if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (pos_magic==MagicNumber || pos_magic==GS_MANUAL_MAGIC))
            {
-            ulong t=PositionGetTicket(i);
-            if(t==0 || !PositionSelectByTicket(t)) continue;
-            if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+            if(target_ticket==0 || target_ticket==t)
               {
-               if(target_ticket==0 || target_ticket==t)
+               string c_reason="";
+               double profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+               if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"MANUAL_DASHBOARD_CLOSE"))
                  {
-                  string c_reason="";
-                  double profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
-                  if(g_executor.ClosePosition(t,g_risk,g_log,c_reason,"MANUAL_DASHBOARD_CLOSE"))
-                    {
-                     g_log.Event("MANUAL_CLOSE","DASHBOARD_USER_COMMAND",StringFormat("ticket=%I64u profit=%.2f",t,profit));
-                    }
+                  g_log.Event("MANUAL_CLOSE","DASHBOARD_USER_COMMAND",StringFormat("ticket=%I64u profit=%.2f magic=%I64u",t,profit,pos_magic));
                  }
               }
            }

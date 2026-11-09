@@ -103,8 +103,9 @@ public:
      {
       if(!risk.CanManage(reason)) return false;
       if(!PositionSelectByTicket(ticket)) return GSReject(reason,"CLOSE_TICKET_NO_LONGER_PRESENT");
+      ulong pos_magic=(ulong)PositionGetInteger(POSITION_MAGIC);
       if(PositionGetString(POSITION_SYMBOL)!=TradeSymbol ||
-         (ulong)PositionGetInteger(POSITION_MAGIC)!=MagicNumber ||
+         (pos_magic!=MagicNumber && pos_magic!=GS_MANUAL_MAGIC) ||
          StringFind(PositionGetString(POSITION_COMMENT),"GS2|")!=0)
          return GSReject(reason,"CLOSE_OWNERSHIP_REJECTED");
       double cur_profit=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
@@ -148,14 +149,20 @@ public:
       ENUM_ORDER_TYPE_FILLING filling;
       if(!spec.Filling(filling,reason)) return false;
       m_trade.SetTypeFilling(filling);
+      m_trade.SetExpertMagicNumber(GS_MANUAL_MAGIC);
       MqlTick tick;
-      if(!SymbolInfoTick(symbol,tick)) return GSReject(reason,"TICK_READ_FAILED");
+      if(!SymbolInfoTick(symbol,tick))
+        {
+         m_trade.SetExpertMagicNumber(MagicNumber);
+         return GSReject(reason,"TICK_READ_FAILED");
+        }
       double price=(ord_type==ORDER_TYPE_BUY ? tick.ask : tick.bid);
       bool sent=m_trade.PositionOpen(symbol,ord_type,volume,price,sl,tp,comment);
+      m_trade.SetExpertMagicNumber(MagicNumber);
       uint code=m_trade.ResultRetcode();
       log.Event("MANUAL_ORDER","DASHBOARD_COMMAND",
-                StringFormat("type=%s lots=%.2f price=%.2f sl=%.2f tp=%.2f retcode=%u deal=%I64u order=%I64u",
-                (ord_type==ORDER_TYPE_BUY ? "BUY" : "SELL"),volume,price,sl,tp,code,m_trade.ResultDeal(),m_trade.ResultOrder()));
+                StringFormat("type=%s lots=%.2f price=%.2f sl=%.2f tp=%.2f magic=%I64u retcode=%u deal=%I64u order=%I64u",
+                (ord_type==ORDER_TYPE_BUY ? "BUY" : "SELL"),volume,price,sl,tp,(ulong)GS_MANUAL_MAGIC,code,m_trade.ResultDeal(),m_trade.ResultOrder()));
       reason=(sent ? "MANUAL_ORDER_SUCCESS" : "MANUAL_ORDER_FAILED");
       return sent;
      }
