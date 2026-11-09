@@ -83,6 +83,9 @@ REASON_DESCRIPTIONS = {
     "BASELINE_RULES": "Sesuai aturan strategi indikator",
     "RECONCILIATION_REQUIRED": "Permintaan diproses broker",
     "CANDIDATE_BASELINE_EMA_RSI": "Validasi indikator EMA & RSI",
+    "CANDIDATE_PULLBACK": "Model Pullback: Retest EMA 20 & pantulan searah tren",
+    "CANDIDATE_BREAKOUT": "Model Breakout: Penembusan rentang lilin & lonjakan volume",
+    "CANDIDATE_CROSSOVER": "Model Crossover: Persilangan baru EMA 20 & EMA 50",
     "HOLD_DAILY_ENTRY_LIMIT": "Batas kuota harian tercapai (mencegah overtrade)",
     "HOLD_SPREAD_ATR_EXCESSIVE": "Spread broker melebar melebihi batas wajar ATR",
     "HOLD_MIDNIGHT_ROLLOVER": "Jam rollover pergantian hari broker (spread melebar ekstrem)",
@@ -161,7 +164,12 @@ def audit_message(row):
         side = "BUY" if match.group(1) == "GS_BUY" else "SELL"
         side_id = "Beli (BUY)" if side == "BUY" else "Jual (SELL)"
         label = f"Sinyal {side} terdeteksi"
-        reason = item["reason_code"] if item["reason_code"] in REASONS | {"CANDIDATE_BASELINE_EMA_RSI"} else "OTHER_REASON_REDACTED"
+        is_valid_signal_reason = (
+            item["reason_code"] in REASONS
+            or item["reason_code"] == "CANDIDATE_BASELINE_EMA_RSI"
+            or item["reason_code"].startswith("CANDIDATE_")
+        )
+        reason = item["reason_code"] if is_valid_signal_reason else "OTHER_REASON_REDACTED"
         metrics = dict(re.findall(r"\b(close|fast|slow|rsi|atr)=([0-9]+(?:\.[0-9]+)?)", item["details"]))
         icon = EVENT_ICONS.get("SIGNAL", "🔔")
         lines = [

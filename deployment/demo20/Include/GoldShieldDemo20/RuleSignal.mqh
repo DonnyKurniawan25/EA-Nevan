@@ -37,10 +37,80 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_ATR_TOO_LOW_DEAD_MARKET"; return GS_HOLD; }
      }
 
-   int side=GSBaselineSide(data.bar.close,data.fast_ema,data.slow_ema,data.rsi,UseRSIFilter);
+   int side=0;
+   string candidate_setup="";
 
-   // Filter RSI momentum: hindari sinyal ragu-ragu di sekitar garis 50
-   if(side!=0 && UseRSIMomentumThreshold && RSIMomentumThreshold>0.0)
+   if(UseMultiSetup)
+     {
+      // Model 1: Pullback / Retest EMA 20 di dalam tren kuat (Prioritas Utama: Risk-to-Reward Terbaik)
+      if(EnableSetupPullback)
+        {
+         // BUY: Struktur Uptrend (Fast > Slow), lilin sempat uji support EMA lalu memantul tutup hijau
+         if(data.fast_ema > data.slow_ema && data.fast_ema >= data.previous_fast_ema &&
+            (data.previous.low <= data.previous_fast_ema || data.bar.low <= data.fast_ema) &&
+            data.bar.close > data.fast_ema && data.bar.close > data.bar.open &&
+            (!UseRSIFilter || (data.rsi >= 48.0 && data.rsi <= 75.0)))
+           {
+            side = 1;
+            candidate_setup = "SETUP_PULLBACK";
+           }
+         // SELL: Struktur Downtrend (Fast < Slow), lilin sempat uji resistensi EMA lalu ditolak tutup merah
+         else if(data.fast_ema < data.slow_ema && data.fast_ema <= data.previous_fast_ema &&
+                 (data.previous.high >= data.previous_fast_ema || data.bar.high >= data.fast_ema) &&
+                 data.bar.close < data.fast_ema && data.bar.close < data.bar.open &&
+                 (!UseRSIFilter || (data.rsi >= 25.0 && data.rsi <= 52.0)))
+           {
+            side = -1;
+            candidate_setup = "SETUP_PULLBACK";
+           }
+        }
+
+      // Model 2: Box / Range Breakout 4-Bar dengan lonjakan momentum & volume
+      if(side==0 && EnableSetupBreakout)
+        {
+         // BUY: Menembus High 4 lilin sebelumnya, ditutup hijau di atas EMA
+         if(data.breakout_high > 0.0 && data.bar.close > data.breakout_high &&
+            data.bar.close > data.bar.open && data.fast_ema > data.slow_ema &&
+            (!UseRSIFilter || (data.rsi >= 50.0 && data.rsi <= 78.0)))
+           {
+            side = 1;
+            candidate_setup = "SETUP_BREAKOUT";
+           }
+         // SELL: Menembus Low 4 lilin sebelumnya, ditutup merah di bawah EMA
+         else if(data.breakout_low > 0.0 && data.bar.close < data.breakout_low &&
+                 data.bar.close < data.bar.open && data.fast_ema < data.slow_ema &&
+                 (!UseRSIFilter || (data.rsi >= 22.0 && data.rsi <= 50.0)))
+           {
+            side = -1;
+            candidate_setup = "SETUP_BREAKOUT";
+           }
+        }
+
+      // Model 3: Baseline EMA Crossover
+      if(side==0 && EnableSetupCrossover)
+        {
+         int base_side = GSBaselineSide(data.bar.close, data.fast_ema, data.slow_ema, data.rsi, UseRSIFilter);
+         if(base_side != 0)
+           {
+            side = base_side;
+            candidate_setup = "SETUP_CROSSOVER";
+           }
+        }
+     }
+   else
+     {
+      side = GSBaselineSide(data.bar.close, data.fast_ema, data.slow_ema, data.rsi, UseRSIFilter);
+      candidate_setup = "SETUP_CROSSOVER";
+     }
+
+   if(side==0)
+     {
+      reason="HOLD_RULES_NO_SETUP";
+      return GS_HOLD;
+     }
+
+   // Filter RSI momentum: hindari sinyal ragu-ragu di sekitar garis 50 (dikecualikan untuk pullback karena titik pantul alami)
+   if(UseRSIMomentumThreshold && RSIMomentumThreshold>0.0 && candidate_setup!="SETUP_PULLBACK")
      {
       if(side==1 && data.rsi<50.0+RSIMomentumThreshold)
         { reason="HOLD_RSI_MOMENTUM_WEAK"; return GS_HOLD; }
@@ -48,8 +118,8 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_RSI_MOMENTUM_WEAK"; return GS_HOLD; }
      }
 
-   // Filter anti-whipsaw: penembusan EMA wajib punya buffer memadai
-   if(side!=0 && EMAPenetrationBufferATR>0.0 && GSPositive(data.atr))
+   // Filter anti-whipsaw: penembusan EMA wajib punya buffer memadai (khusus crossover)
+   if(EMAPenetrationBufferATR>0.0 && GSPositive(data.atr) && candidate_setup=="SETUP_CROSSOVER")
      {
       double pen_buf=data.atr*EMAPenetrationBufferATR;
       if(side==1 && data.bar.close<data.fast_ema+pen_buf)
@@ -59,14 +129,14 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
      }
 
    // Filter anti-chasing: tolak entry jika harga sudah lonjak terlalu jauh dari EMA (pucuk/lembah)
-   if(side!=0 && GSPositive(MaxEntryStretchATR) && GSPositive(data.atr))
+   if(GSPositive(MaxEntryStretchATR) && GSPositive(data.atr))
      {
       double max_stretch=data.atr*MaxEntryStretchATR;
       if(MathAbs(data.bar.close-data.fast_ema)>max_stretch)
         { reason="HOLD_PRICE_OVEREXTENDED"; return GS_HOLD; }
      }
 
-   if(side!=0 && RequireFreshCross)
+   if(RequireFreshCross && candidate_setup=="SETUP_CROSSOVER")
      {
       bool fresh_buy=(data.previous_fast_ema<=data.previous_slow_ema && data.fast_ema>data.slow_ema) ||
                      (data.previous.close<=data.previous_fast_ema && data.bar.close>data.fast_ema);
@@ -79,7 +149,7 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
      }
 
    // Prioritas 2: Multi-Timeframe Trend Filter (M15 + H1 EMA) & Slope Alignment
-   if(side!=0 && UseHTFTrendFilter)
+   if(UseHTFTrendFilter)
      {
       if(!GSPositive(data.trend_close) || !GSPositive(data.trend_fast_ema) || !GSPositive(data.trend_slow_ema))
         { reason="HOLD_HTF_DATA_INVALID"; return GS_HOLD; }
@@ -100,7 +170,7 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
      }
 
    // Paket C: Filter arah & momentum candle M15
-   if(side!=0 && UseCandleDirectionFilter)
+   if(UseCandleDirectionFilter)
      {
       double range=data.bar.high-data.bar.low;
       if(side==1)
@@ -127,7 +197,7 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
      }
 
    // Paket C: Filter volume transaksi (menghindari candle sepi / tipuan spread)
-   if(side!=0 && UseTickVolumeFilter)
+   if(UseTickVolumeFilter)
      {
       if(data.avg_tick_volume>0.0 && (double)data.bar.tick_volume<data.avg_tick_volume*MinTickVolumeRatio)
         { reason="HOLD_LOW_TICK_VOLUME"; return GS_HOLD; }
@@ -135,7 +205,7 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
         { reason="HOLD_VOLUME_CLIMAX"; return GS_HOLD; }
      }
 
-   if(side!=0 && SignalModel==GS_TREND_PULLBACK)
+   if(SignalModel==GS_TREND_PULLBACK)
      {
       if(!GSTrendPullbackOK(side,data.bar.open,data.bar.close,data.previous.high,data.previous.low,
                            data.previous_fast_ema,data.fast_ema,data.slow_ema,data.previous_slow_ema,
@@ -144,7 +214,29 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
       reason="CANDIDATE_CONFIRMED_TREND_PULLBACK";
       return (GSSide)side;
      }
-   reason=(side==0 ? "HOLD_RULES_NO_SETUP" : "CANDIDATE_BASELINE_EMA_RSI");
+
+   // Skor Konfluensi
+   int conf_score=0;
+   if(side==1 && data.trend_close>data.trend_slow_ema && data.trend_fast_ema>data.trend_slow_ema) conf_score+=30;
+   else if(side==-1 && data.trend_close<data.trend_slow_ema && data.trend_fast_ema<data.trend_slow_ema) conf_score+=30;
+   if(side==1 && data.fast_ema>data.slow_ema) conf_score+=20;
+   else if(side==-1 && data.fast_ema<data.slow_ema) conf_score+=20;
+   if(data.adx>=20.0)
+     {
+      conf_score+=15;
+      if(data.adx>data.previous_adx) conf_score+=5;
+     }
+   double crange=data.bar.high-data.bar.low;
+   if(crange>0.0 && MathAbs(data.bar.close-data.bar.open)/crange>=0.50) conf_score+=15;
+   if(data.avg_tick_volume>0.0 && (double)data.bar.tick_volume>=data.avg_tick_volume*1.0) conf_score+=15;
+
+   if(candidate_setup=="SETUP_PULLBACK")
+      reason=StringFormat("CANDIDATE_PULLBACK_CONF%d",conf_score);
+   else if(candidate_setup=="SETUP_BREAKOUT")
+      reason=StringFormat("CANDIDATE_BREAKOUT_CONF%d",conf_score);
+   else
+      reason=StringFormat("CANDIDATE_CROSSOVER_CONF%d",conf_score);
+
    return (GSSide)side;
   }
 #endif

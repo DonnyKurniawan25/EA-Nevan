@@ -77,6 +77,10 @@ input bool UseRSIMomentumThreshold=true; // Filter deviasi momentum RSI menjauhi
 input double RSIMomentumThreshold=2.0; // Deviasi minimal RSI dari 50 (BUY >= 52, SELL <= 48)
 input bool UseAdaptiveADXTrailing=true; // Trailing adaptif responsif saat tren ADX rendah (< 25)
 input double AdaptiveLowADXTrailingATR=0.8; // Jarak trailing saat ADX < 25 dalam kelipatan ATR (0.8 ATR)
+input bool UseMultiSetup=true; // Aktifkan multi-setup (Crossover, Pullback Retest, Box Breakout)
+input bool EnableSetupCrossover=true; // Setup A: Baseline Crossover EMA 20/50
+input bool EnableSetupPullback=true; // Setup B: Pullback / Retest EMA 20 di dalam tren kuat
+input bool EnableSetupBreakout=true; // Setup C: Breakout Range Lilin 4-Bar + Volume Surge
 input bool UseDailyProfitLock=true; // Kunci kemenangan harian: berhenti buka posisi baru jika target harian tercapai
 input double DailyProfitTargetPct=2.0; // Target profit harian dalam % dari modal (2.0 = 2%)
 input double DailyProfitTargetUSD=0.0; // Target profit harian alternatif dalam USD (0 = gunakan %)

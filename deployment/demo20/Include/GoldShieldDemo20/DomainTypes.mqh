@@ -27,6 +27,8 @@ struct GSMarketSnapshot
    double adx;
    double previous_adx;
    double avg_tick_volume;
+   double breakout_high;
+   double breakout_low;
    double previous_fast_ema;
    double previous_slow_ema;
    double trend_close;

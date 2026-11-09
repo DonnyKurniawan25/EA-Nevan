@@ -93,6 +93,17 @@ public:
       int count_vol=MathMin(copied,5);
       for(int v=0;v<count_vol;v++) sum_vol+=rates[v].tick_volume;
       snapshot.avg_tick_volume=(count_vol>0 ? (double)sum_vol/count_vol : (double)rates[0].tick_volume);
+      
+      double b_high=0.0;
+      double b_low=999999999.0;
+      int b_count=MathMin(copied,5);
+      for(int b=1;b<b_count;b++)
+        {
+         if(rates[b].high>b_high) b_high=rates[b].high;
+         if(rates[b].low<b_low)   b_low=rates[b].low;
+        }
+      snapshot.breakout_high=(b_high>0.0 ? b_high : 0.0);
+      snapshot.breakout_low=(b_low<999999999.0 ? b_low : 0.0);
       snapshot.available_at_server=snapshot.bar.time+PeriodSeconds(m_timeframe);
       if(snapshot.bar.time<=snapshot.previous.time ||
          !GSValidOHLC(snapshot.bar.open,snapshot.bar.high,snapshot.bar.low,snapshot.bar.close) ||

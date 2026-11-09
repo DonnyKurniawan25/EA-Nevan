@@ -1088,9 +1088,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         const REASON_DICT = {
+            'CANDIDATE_PULLBACK': {
+                title: 'Model Pullback / EMA Retest Terkonfirmasi',
+                desc: 'Harga menguji area EMA 20 di dalam tren kuat dan memantul konfirmasi dengan lilin momentum tebal. Mengambil posisi pada harga diskon.',
+                icon: '🎯'
+            },
+            'CANDIDATE_BREAKOUT': {
+                title: 'Model Box Breakout Terkonfirmasi',
+                desc: 'Harga menembus batas rentang 4 lilin sebelumnya disertai lonjakan volume transaksi. Mengambil posisi momentum ledakan tren.',
+                icon: '🚀'
+            },
+            'CANDIDATE_CROSSOVER': {
+                title: 'Model Crossover EMA Terkonfirmasi',
+                desc: 'Terjadi persilangan baru EMA 20 dan EMA 50 didukung keselarasan tren H1 dan kekuatan ADX.',
+                icon: '⚡'
+            },
             'HOLD_RULES_NO_SETUP': {
-                title: 'Belum Terbentuk Pola Crossover Baru',
-                desc: 'Kondisi indikator tren belum membentuk persilangan (crossover) baru yang valid antara EMA 20 dan EMA 50. Robot sengaja menahan diri agar tidak masuk di tengah pergerakan harga tanpa sinyal awal yang kuat.',
+                title: 'Menunggu Pola Multi-Setup (Pullback / Breakout / Crossover)',
+                desc: 'Kondisi pasar saat ini belum memenuhi salah satu dari 3 setup entri unggulan (Pullback Retest, Box Breakout, atau Baseline Crossover). Robot sabar menahan diri agar tidak masuk di tengah pergerakan liar.',
                 icon: '⏳'
             },
             'HOLD_ADX_SIDEWAYS': {
@@ -1280,9 +1295,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         const typeBg = isBuy ? '#f0fdf4' : '#fef2f2';
                         const typeBorder = isBuy ? 'var(--green-border)' : 'var(--red-border)';
 
+                        let modelName = 'Multi-Konfluensi Tren';
+                        if ((dec.reason || '').indexOf('PULLBACK') !== -1) modelName = 'Model Pullback (Retest EMA Diskon)';
+                        else if ((dec.reason || '').indexOf('BREAKOUT') !== -1) modelName = 'Model Box Breakout (Ledakan Volume)';
+                        else if ((dec.reason || '').indexOf('CROSSOVER') !== -1) modelName = 'Model Baseline Crossover';
+
                         const reasonText = isBuy 
-                            ? `Sinyal <strong>BUY</strong> diambil karena candle M15 menembus EMA ke atas (Golden Cross), didukung tren H1 Bullish, ADX > 20 menanjak, dan candle penutupan hijau kuat.`
-                            : `Sinyal <strong>SELL</strong> diambil karena candle M15 menembus EMA ke bawah (Death Cross), didukung tren H1 Bearish, ADX > 20 menanjak, dan candle penutupan merah kuat.`;
+                            ? `Sinyal <strong>BUY [${modelName}]</strong> diambil karena konfirmasi tren H1 Bullish, ADX > 20 menanjak, dan candle M15 hijau solid.`
+                            : `Sinyal <strong>SELL [${modelName}]</strong> diambil karena konfirmasi tren H1 Bearish, ADX > 20 menanjak, dan candle M15 merah solid.`;
 
                         tradesHtml += `
                         <div class="trade-card" style="background:${typeBg}; border-color:${typeBorder};">
