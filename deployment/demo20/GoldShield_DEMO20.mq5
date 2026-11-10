@@ -795,7 +795,7 @@ int OnInit(void)
    if(!g_symbol.Load(TradeSymbol,reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_FAILED; }
    if(!g_storage.Init(TradeSymbol,MagicNumber,reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_FAILED; }
    if(!GSConfigureCapital(g_storage,reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_FAILED; }
-   if(is_demo && !GSDemo20Init(g_storage,TradeSymbol,MagicNumber,reason)) { Print("DEMO20 INIT: ",reason); return INIT_FAILED; }
+   if((is_demo || is_cent) && !GSDemo20Init(g_storage,TradeSymbol,MagicNumber,reason)) { Print("DEMO20 INIT: ",reason); return INIT_FAILED; }
    if(!g_log.Init(g_storage.Key())) { Print("GOLDSHIELD INIT: AUDIT_FILE_UNAVAILABLE"); return INIT_FAILED; }
    g_state.Set(RECOVERY,"RECONCILE_BROKER_BEFORE_SIGNALS",g_log);
    bool need_htf=(SignalModel==GS_TREND_PULLBACK || UseHTFTrendFilter);

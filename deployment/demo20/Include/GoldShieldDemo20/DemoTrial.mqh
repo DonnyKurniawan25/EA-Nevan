@@ -92,7 +92,9 @@ bool GS20Put(const string key,const double value)
 
 bool GSDemo20Init(GSStorage &store,const string symbol,const ulong magic,string &reason)
   {
-   if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
+   bool is_demo=(AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO);
+   bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC" && symbol=="XAUUSDc");
+   if(!is_demo && !is_cent)
       return GSReject(reason,"DEMO20_REFUSES_ALL_REAL_ACCOUNTS");
    int entries,closed,wins,losses; double net;
    if(!GS20History(symbol,magic,entries,closed,wins,losses,net)) return GSReject(reason,"DEMO20_HISTORY_UNAVAILABLE");
@@ -117,7 +119,9 @@ bool GSDemo20CanEnter(GSStorage &store,string &reason)
   {
    if(FileIsExist("GoldShield\\MANUAL_PAUSE"))
       return GSReject(reason,"HOLD_PAUSED_BY_USER_COMMAND");
-   if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO ||
+   bool is_demo=(AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO);
+   bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC");
+   if((!is_demo && !is_cent) ||
       store.Get(".d20.schema")!=1 || store.Get(".d20.limit")!=GS_DEMO20_LIMIT)
       return GSReject(reason,"DEMO20_ACCOUNT_OR_LIMIT_INVALID");
    double used=store.Get(".d20.used");
