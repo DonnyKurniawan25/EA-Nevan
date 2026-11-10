@@ -445,6 +445,15 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("Floating Minus: -$150.00 USD", self.sent[0])
         self.assertIn("Ekuitas Akun: $99,850.00 USD", self.sent[0])
 
+    def test_floating_drawdown_alert_disabled(self):
+        n = self.notifier()
+        n.enable_drawdown_alert = False
+        n.poll()
+        acc = self.source / "account_live.csv"
+        acc.write_text("time_server,balance,equity,currency,open_positions\n2026.11.08 02:00:00,100000.0,99850.0,USD,1\n")
+        n.poll()
+        self.assertEqual(len(self.sent), 0)
+
     def test_interactive_commands(self):
         n = self.notifier()
         handle = self.module.handle_interactive_command

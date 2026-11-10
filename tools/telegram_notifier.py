@@ -617,7 +617,7 @@ def handle_interactive_command(text, source_dir, state, sender):
 
 
 class Notifier:
-    def __init__(self, source, state_dir, sender, dry_run=False):
+    def __init__(self, source, state_dir, sender, dry_run=False, enable_drawdown_alert=None):
         self.source = Path(source).resolve()
         self.directory = Path(state_dir).resolve()
         if not dry_run:
@@ -626,6 +626,12 @@ class Notifier:
         self.sender = sender
         self.dry_run = dry_run
         self.state = json.loads(self.path.read_text()) if self.path.exists() else None
+        if enable_drawdown_alert is not None:
+            self.enable_drawdown_alert = bool(enable_drawdown_alert)
+        else:
+            self.enable_drawdown_alert = os.environ.get("ENABLE_DRAWDOWN_ALERT", "true").lower() not in (
+                "false", "0", "no", "disabled"
+            )
 
     def save(self):
         if self.dry_run:
@@ -733,42 +739,43 @@ class Notifier:
             self.save()
 
         # Paket D: Floating Drawdown Alert
-        acc_file = self.source / "account_live.csv"
-        if acc_file.exists():
-            try:
-                lines = acc_file.read_text(errors="ignore").strip().splitlines()
-                if len(lines) >= 2:
-                    parts = lines[1].split(",")
-                    bal_val, eq_val, curr, open_cnt = (
-                        float(parts[1]), float(parts[2]), parts[3], int(parts[4])
-                    )
-                    drawdown = max(0.0, bal_val - eq_val)
-                    drawdown_pct = (drawdown / bal_val * 100.0) if bal_val > 0 else 0.0
-                    last_alert_tier = float(self.state.get("last_drawdown_alert_tier", 0.0))
-                    # Trigger alert if floating minus >= 1.0 USD and drawdown_pct >= 0.1%
-                    if open_cnt > 0 and drawdown >= 1.0 and drawdown_pct >= 0.1:
-                        current_tier = round(drawdown_pct * 4) / 4.0  # Alert every 0.25% step
-                        if current_tier > last_alert_tier:
-                            alert_msg = (
-                                f"⚠️ SIAGA FLOATING DRAWDOWN\n"
-                                f"━━━━━━━━━━━━━━━━━━━━\n"
-                                f"• Saldo Akun: ${bal_val:,.2f} {curr}\n"
-                                f"• Ekuitas Akun: ${eq_val:,.2f} {curr}\n"
-                                f"• Floating Minus: -${drawdown:.2f} {curr} (-{drawdown_pct:.2f}%)\n"
-                                f"• Posisi Terbuka: {open_cnt} Transaksi\n"
-                                f"━━━━━━━━━━━━━━━━━━━━\n"
-                                f"🛡️ Proteksi: Robot memantau Stop Loss (2.0 ATR) & Early Cut-Loss otomatis."
-                            )
-                            self.state["last_drawdown_alert_tier"] = current_tier
-                            self.state["pending"] = {"message": alert_msg, "group": "system", "key": "drawdown_alert", "value": current_tier}
-                            self.save()
-                            self.deliver_pending()
-                    elif open_cnt == 0 or drawdown < 0.2:
-                        if last_alert_tier > 0.0:
-                            self.state["last_drawdown_alert_tier"] = 0.0
-                            self.save()
-            except Exception:
-                pass
+        if self.enable_drawdown_alert:
+            acc_file = self.source / "account_live.csv"
+            if acc_file.exists():
+                try:
+                    lines = acc_file.read_text(errors="ignore").strip().splitlines()
+                    if len(lines) >= 2:
+                        parts = lines[1].split(",")
+                        bal_val, eq_val, curr, open_cnt = (
+                            float(parts[1]), float(parts[2]), parts[3], int(parts[4])
+                        )
+                        drawdown = max(0.0, bal_val - eq_val)
+                        drawdown_pct = (drawdown / bal_val * 100.0) if bal_val > 0 else 0.0
+                        last_alert_tier = float(self.state.get("last_drawdown_alert_tier", 0.0))
+                        # Trigger alert if floating minus >= 1.0 USD and drawdown_pct >= 0.1%
+                        if open_cnt > 0 and drawdown >= 1.0 and drawdown_pct >= 0.1:
+                            current_tier = round(drawdown_pct * 4) / 4.0  # Alert every 0.25% step
+                            if current_tier > last_alert_tier:
+                                alert_msg = (
+                                    f"⚠️ SIAGA FLOATING DRAWDOWN\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"• Saldo Akun: ${bal_val:,.2f} {curr}\n"
+                                    f"• Ekuitas Akun: ${eq_val:,.2f} {curr}\n"
+                                    f"• Floating Minus: -${drawdown:.2f} {curr} (-{drawdown_pct:.2f}%)\n"
+                                    f"• Posisi Terbuka: {open_cnt} Transaksi\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"🛡️ Proteksi: Robot memantau Stop Loss (2.0 ATR) & Early Cut-Loss otomatis."
+                                )
+                                self.state["last_drawdown_alert_tier"] = current_tier
+                                self.state["pending"] = {"message": alert_msg, "group": "system", "key": "drawdown_alert", "value": current_tier}
+                                self.save()
+                                self.deliver_pending()
+                        elif open_cnt == 0 or drawdown < 0.2:
+                            if last_alert_tier > 0.0:
+                                self.state["last_drawdown_alert_tier"] = 0.0
+                                self.save()
+                except Exception:
+                    pass
 
         # Interactive polling is opt-in and requires a dedicated, non-Hermes bot.
         if getattr(self.sender, "polling_enabled", False) and hasattr(self.sender, "get_updates"):
