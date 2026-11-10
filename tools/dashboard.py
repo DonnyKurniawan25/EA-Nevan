@@ -2177,7 +2177,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     id: 'htf_trend',
                     name: '4. Keselarasan Tren Besar H1 (Multi-Timeframe)',
                     condition: 'Order wajib searah dengan tren institusi H1 (H1 Close & Fast > Slow EMA).',
-                    current: htfFast > 0 ? `H1 Fast: ${htfFast.toFixed(2)} | Slow: ${htfSlow.toFixed(2)} (Bullish)` : 'Sesuai tren H1',
+                    current: rsn === 'HOLD_HTF_TREND_BULLISH' ? `M15 mau SELL tapi H1 masih Bullish (${htfFast.toFixed(2)} > ${htfSlow.toFixed(2)})` :
+                             rsn === 'HOLD_HTF_TREND_BEARISH' ? `M15 mau BUY tapi H1 masih Bearish (${htfFast.toFixed(2)} < ${htfSlow.toFixed(2)})` :
+                             (htfFast > 0 ? `H1 Fast: ${htfFast.toFixed(2)} | Slow: ${htfSlow.toFixed(2)} (${htfFast >= htfSlow ? 'Bullish' : 'Bearish'})` : 'Sesuai tren H1'),
                     status: isTradeActive || (!rsn.includes('HOLD_HTF_TREND')) ? 'pass' : 'block',
                     badgeText: rsn.includes('HOLD_HTF_TREND') ? 'BERTENTANGAN 🛑' : 'MEMENUHI ✅ (+20 Poin)',
                     poin: '20 Poin'
