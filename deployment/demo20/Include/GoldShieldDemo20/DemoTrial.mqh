@@ -186,20 +186,17 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
             if(pt>0 && PositionSelectByTicket(pt))
               {
                ulong pt_magic=(ulong)PositionGetInteger(POSITION_MAGIC);
-               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (pt_magic==MagicNumber || pt_magic==GS_MANUAL_MAGIC))
-                 {
-                  string origin=(pt_magic==GS_MANUAL_MAGIC ? "MANUAL" : "ROBOT");
-                  FileWrite(pos_file,IntegerToString(pt),
-                            PositionGetString(POSITION_SYMBOL),
-                            ((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? "BUY" : "SELL"),
-                            DoubleToString(PositionGetDouble(POSITION_VOLUME),2),
-                            DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN),_Digits),
-                            DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT),_Digits),
-                            DoubleToString(PositionGetDouble(POSITION_SL),_Digits),
-                            DoubleToString(PositionGetDouble(POSITION_TP),_Digits),
-                            DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2),
-                            origin);
-                 }
+               string origin=(pt_magic==MagicNumber ? "ROBOT" : "MANUAL");
+               FileWrite(pos_file,IntegerToString(pt),
+                         PositionGetString(POSITION_SYMBOL),
+                         ((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? "BUY" : "SELL"),
+                         DoubleToString(PositionGetDouble(POSITION_VOLUME),2),
+                         DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_SL),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_TP),_Digits),
+                         DoubleToString(PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP),2),
+                         origin);
               }
            }
          FileFlush(pos_file); FileClose(pos_file);
@@ -226,7 +223,7 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
          for(int h=HistoryDealsTotal()-1;h>=0;h--)
            {
             ulong dt=HistoryDealGetTicket(h);
-            if(dt>0 && HistoryDealGetString(dt,DEAL_SYMBOL)==TradeSymbol && (ulong)HistoryDealGetInteger(dt,DEAL_MAGIC)==MagicNumber)
+            if(dt>0)
               {
                ENUM_DEAL_ENTRY d_entry=(ENUM_DEAL_ENTRY)HistoryDealGetInteger(dt,DEAL_ENTRY);
                if(d_entry==DEAL_ENTRY_OUT || d_entry==DEAL_ENTRY_IN)
