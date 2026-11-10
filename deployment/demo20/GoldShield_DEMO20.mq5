@@ -114,6 +114,23 @@ void GSProcess(const bool evaluate_signal)
      }
    g_had_position=(g_owned.count>0);
 
+   // Rule -3: Operator Reset Latch Command
+   if(FileIsExist("GoldShield\\RESET_LATCH"))
+     {
+      FileDelete("GoldShield\\RESET_LATCH");
+      g_runtime_hard_block=false;
+      g_runtime_block=false;
+      g_storage.Set(".blocked",0.0);
+      double cur_eq=AccountInfoDouble(ACCOUNT_EQUITY);
+      if(cur_eq>0.0)
+        {
+         g_storage.Set(".cap_anchor",cur_eq);
+         g_storage.Set(".reference",cur_eq);
+        }
+      g_state.Set(READY,"OPERATOR_MANUAL_RESET_LATCH",g_log);
+      g_log.Event("OPERATOR_RESET","LATCH_CLEARED","Equity recovered, latch unblocked by operator");
+     }
+
    // Rule -1: Manual Dashboard Close Command (Interaksi Tombol Tutup Posisi via Web Dashboard)
    if(FileIsExist("GoldShield\\MANUAL_CLOSE"))
      {
