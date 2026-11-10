@@ -87,9 +87,11 @@ public:
      {
       if(ExecutionMode!=RULES_DEMO || !DemoTradingOptIn)
          return GSReject(reason,"MONITOR_ONLY_NO_TRADE_REQUESTS");
-      // Real execution is deliberately unavailable, including when an input is changed.
-      if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
-         return GSReject(reason,"DEMO_ACCOUNT_REQUIRED");
+      // Allow demo account OR cent account with USC currency and XAUUSDc symbol
+      bool is_demo=(AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO);
+      bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC" && TradeSymbol=="XAUUSDc");
+      if(!is_demo && !is_cent)
+         return GSReject(reason,"DEMO_OR_CENT_ACCOUNT_REQUIRED");
       if(AccountInfoInteger(ACCOUNT_MARGIN_MODE)!=ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
          return GSReject(reason,"HEDGING_ACCOUNT_REQUIRED");
       if(!MQLInfoInteger(MQL_TESTER) && !TerminalInfoInteger(TERMINAL_CONNECTED))

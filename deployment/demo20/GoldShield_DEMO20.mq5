@@ -779,18 +779,23 @@ int OnInit(void)
         { Print("DEMO20 account not synchronized; no state or orders created"); return INIT_FAILED; }
      }
    string reason="";
-   if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO || ExecutionMode!=RULES_DEMO ||
-      AccountInfoString(ACCOUNT_SERVER)!="Exness-MT5Trial7" || AccountInfoString(ACCOUNT_CURRENCY)!="USD")
+   bool is_demo=(AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO &&
+                 AccountInfoString(ACCOUNT_SERVER)=="Exness-MT5Trial7" &&
+                 AccountInfoString(ACCOUNT_CURRENCY)=="USD");
+   bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC" &&
+                 TradeSymbol=="XAUUSDc" &&
+                 StringFind(AccountInfoString(ACCOUNT_SERVER),"Exness")>=0);
+   if(!is_demo && !is_cent)
      { Print("DEMO20 REFUSES NON-TARGET/REAL ACCOUNT"); return INIT_FAILED; }
    if(!GSValidateSettings(reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_PARAMETERS_INCORRECT; }
    if(AccountInfoInteger(ACCOUNT_MARGIN_MODE)!=ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
      { Print("GOLDSHIELD INIT: HEDGING_ACCOUNT_REQUIRED"); return INIT_FAILED; }
-   if(ExecutionMode==RULES_DEMO && AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
+   if(!is_demo && !is_cent && ExecutionMode==RULES_DEMO && AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
      { Print("GOLDSHIELD INIT: DEMO_ACCOUNT_REQUIRED"); return INIT_FAILED; }
    if(!g_symbol.Load(TradeSymbol,reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_FAILED; }
    if(!g_storage.Init(TradeSymbol,MagicNumber,reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_FAILED; }
    if(!GSConfigureCapital(g_storage,reason)) { Print("GOLDSHIELD INIT: ",reason); return INIT_FAILED; }
-   if(!GSDemo20Init(g_storage,TradeSymbol,MagicNumber,reason)) { Print("DEMO20 INIT: ",reason); return INIT_FAILED; }
+   if(is_demo && !GSDemo20Init(g_storage,TradeSymbol,MagicNumber,reason)) { Print("DEMO20 INIT: ",reason); return INIT_FAILED; }
    if(!g_log.Init(g_storage.Key())) { Print("GOLDSHIELD INIT: AUDIT_FILE_UNAVAILABLE"); return INIT_FAILED; }
    g_state.Set(RECOVERY,"RECONCILE_BROKER_BEFORE_SIGNALS",g_log);
    bool need_htf=(SignalModel==GS_TREND_PULLBACK || UseHTFTrendFilter);
