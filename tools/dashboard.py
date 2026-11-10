@@ -2111,16 +2111,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
-            // Sesi Trading Aktif Emas: 02:00–21:00 Server (09:00 WIB Pagi s/d 04:00 WIB Subuh)
-            const isSessionPass = isTradeActive || isCrypto || (serverHour >= 2 && serverHour < 21);
+            // Sesi Trading: 24 Jam Non-Stop (UseSessionFilter = false)
             let sessionStatus = 'pass';
-            let sessionText = 'MEMENUHI ✅ (Sesi Aktif)';
-            if (isCrypto) {
-                sessionText = 'MEMENUHI ✅ (Kripto 24/7)';
-            } else if (!isSessionPass) {
-                sessionStatus = rsn === 'HOLD_SESSION_FILTER_CLOSED' ? 'block' : 'fail';
-                sessionText = serverHour >= 0 && serverHour < 2 ? 'BELUM BUKA ⏳ (Jam 02:00)' : 'SESI TUTUP 🌙';
-            }
+            let sessionText = isCrypto ? 'MEMENUHI ✅ (Kripto 24/7)' : 'MEMENUHI ✅ (24 Jam Non-Stop)';
 
             // Perhitungan Skor Konfluensi Dinamis (0 - 100 Poin)
             let confScore = 0;
@@ -2155,10 +2148,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const rules = [
                 {
                     id: 'session',
-                    name: '1. Sesi Jam Bursa Likuiditas (02:00–21:00 Server)',
-                    condition: 'Jendela perdagangan aktif: Sesi Asia (09:00 WIB), London, & New York hingga subuh 04:00 WIB.',
-                    current: isCrypto ? 'Pasar Kripto 24/7' : (serverHour >= 0 ? `Jam Server: ${serverHour.toString().padStart(2, '0')}:xx (Sesi Aktif: 02:00–21:00)` : 'Mengikuti server broker'),
-                    status: sessionStatus,
+                    name: '1. Sesi Jam Bursa (24 Jam Non-Stop)',
+                    condition: 'Jendela perdagangan aktif 24 jam dengan proteksi rollover spread otomatis.',
+                    current: isCrypto ? 'Pasar Kripto 24/7' : (serverHour >= 0 ? `Jam Server: ${serverHour.toString().padStart(2, '0')}:xx (Trading 24 Jam Aktif)` : 'Trading 24 Jam Aktif'),
+                    status: 'pass',
                     badgeText: sessionText,
                     poin: 'Syarat Waktu'
                 },
