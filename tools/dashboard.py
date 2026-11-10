@@ -1455,62 +1455,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- CARD TRADING MANUAL (MODE GABUT / TRANSAKSI SENDIRI) -->
-        <div class="trade-exec-card" id="trade-exec-card">
-            <div class="trade-exec-header">
-                <div class="trade-exec-title">
-                    <span>⚡</span>
-                    <span>Pasang Posisi Cepat (Mode Trading Mandiri)</span>
-                    <span class="badge-operator">DONNY ONLY</span>
-                </div>
-                <div id="trade-auth-status" style="font-size:0.75rem; color:var(--text-muted);">
-                    🔒 Terproteksi PIN
-                </div>
-            </div>
-            <div class="trade-exec-body">
-                <div class="trade-form-row">
-                    <div class="form-group">
-                        <span class="form-label">Pilih Ukuran Lot</span>
-                        <div class="lot-pills">
-                            <button type="button" class="pill-lot active" onclick="setTradeLot(0.01, this)">0.01</button>
-                            <button type="button" class="pill-lot" onclick="setTradeLot(0.02, this)">0.02</button>
-                            <button type="button" class="pill-lot" onclick="setTradeLot(0.05, this)">0.05</button>
-                            <input type="number" id="trade-lot-input" class="lot-input" value="0.01" step="0.01" min="0.01" max="0.05" onchange="onCustomLotChange(this.value)">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <span class="form-label">Manajemen Risiko Robot</span>
-                        <div class="auto-protect-box">
-                            <input type="checkbox" id="trade-auto-protect" checked onchange="toggleAutoProtect(this.checked)">
-                            <label for="trade-auto-protect" class="auto-protect-text">Proteksi Otomatis (SL 2.0 ATR & Fast Profit Lock)</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="trade-custom-row" id="trade-custom-inputs" style="display:none;">
-                    <div>
-                        <span class="form-label">Manual Stop Loss (0 = default ATR)</span>
-                        <input type="number" id="trade-custom-sl" step="0.01" placeholder="Otomatis ATR">
-                    </div>
-                    <div>
-                        <span class="form-label">Manual Take Profit (0 = default ATR)</span>
-                        <input type="number" id="trade-custom-tp" step="0.01" placeholder="Otomatis ATR">
-                    </div>
-                </div>
-
-                <div class="trade-buttons-row">
-                    <button type="button" class="btn-trade btn-trade-buy" onclick="clickManualOrder('BUY')">
-                        <span class="btn-trade-main">🟢 PASANG BUY (LONG)</span>
-                        <span class="btn-trade-sub" id="btn-buy-sub">Beli Sekarang @ Pasar • SL/TP Terproteksi</span>
-                    </button>
-                    <button type="button" class="btn-trade btn-trade-sell" onclick="clickManualOrder('SELL')">
-                        <span class="btn-trade-main">🔴 PASANG SELL (SHORT)</span>
-                        <span class="btn-trade-sub" id="btn-sell-sub">Jual Sekarang @ Pasar • SL/TP Terproteksi</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- TAB BUTTONS -->
         <div class="tabs-header">
             <button class="tab-btn active" onclick="switchTab('positions')">
@@ -1643,7 +1587,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- FOOTER -->
         <footer>
             <p>GoldShield AI EA V2 • Mode: Live Interactive MT5 • Port 8089 • Auto-Refresh tiap 3 detik</p>
-            <p style="margin-top:4px; color:var(--text-subtle);">Dashboard dilengkapi autentikasi PIN Trading operator untuk pasang & tutup posisi mandiri.</p>
+            <p style="margin-top:4px; color:var(--text-subtle);">Dashboard monitoring real-time aktivitas & analisis robot trading EA GoldShield.</p>
         </footer>
     </div>
 
@@ -1652,10 +1596,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <button type="button" class="mob-nav-btn active" id="mob-nav-chart" onclick="scrollToElement('tv-chart-frame'); activateMobNav(this)">
             <span>📈</span>
             <span>Grafik</span>
-        </button>
-        <button type="button" class="mob-nav-btn" id="mob-nav-trade" onclick="scrollToElement('trade-exec-card'); activateMobNav(this)">
-            <span>⚡</span>
-            <span>Trade</span>
         </button>
         <button type="button" class="mob-nav-btn" id="mob-nav-pos" onclick="switchTab('positions'); scrollToElement('tab-positions'); activateMobNav(this)">
             <span>📋</span>
