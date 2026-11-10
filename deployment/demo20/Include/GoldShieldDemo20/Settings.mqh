@@ -36,7 +36,7 @@ input int MaxSignalAgeSeconds=120;
 input int MaxHoldMinutes=0; // Auto-close profitable trade after N minutes (0=disabled, dynamic market-based exit)
 input bool UseEarlyReversalExit=true; // Close position early if M15 candle confirms trend reversal
 input bool UseBreakEvenProtection=true; // Protect capital once trade enters profit
-input double BreakEvenTriggerATR=0.35; // Profit distance in ATR to activate break-even guard (0.35 ATR = ~$3.2 USD)
+input double BreakEvenTriggerATR=0.80; // Profit distance in ATR to activate break-even guard (0.80 ATR = ~$7.2 USD)
 input double BreakEvenLockATR=0.05; // Nominal profit yang dikunci saat Break-Even dalam satuan ATR (0.05 ATR = ~$0.5 USD)
 input bool UseTrailingStop=true; // Dynamic ATR trailing stop after break-even
 input double TrailingStopATR=1.0; // Trailing stop distance behind price in ATR multiples

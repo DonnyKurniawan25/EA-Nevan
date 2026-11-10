@@ -45,18 +45,19 @@ GSSide GSEvaluateRules(const GSMarketSnapshot &data,const MqlTick &tick,string &
       // Model 1: Pullback / Retest EMA 20 di dalam tren kuat (Prioritas Utama: Risk-to-Reward Terbaik)
       if(EnableSetupPullback)
         {
-         // BUY: Struktur Uptrend (Fast > Slow), lilin sempat uji support EMA lalu memantul tutup hijau
+         double pullback_zone = GSPositive(data.atr) ? (data.atr * 0.15) : 0.0;
+         // BUY: Struktur Uptrend (Fast > Slow), lilin sempat uji support EMA (toleransi 0.15 ATR) lalu memantul tutup hijau
          if(data.fast_ema > data.slow_ema && data.fast_ema >= data.previous_fast_ema &&
-            (data.previous.low <= data.previous_fast_ema || data.bar.low <= data.fast_ema) &&
+            (data.previous.low <= data.previous_fast_ema + pullback_zone || data.bar.low <= data.fast_ema + pullback_zone) &&
             data.bar.close > data.fast_ema && data.bar.close > data.bar.open &&
             (!UseRSIFilter || (data.rsi >= 48.0 && data.rsi <= 75.0)))
            {
             side = 1;
             candidate_setup = "SETUP_PULLBACK";
            }
-         // SELL: Struktur Downtrend (Fast < Slow), lilin sempat uji resistensi EMA lalu ditolak tutup merah
+         // SELL: Struktur Downtrend (Fast < Slow), lilin sempat uji resistensi EMA (toleransi 0.15 ATR) lalu ditolak tutup merah
          else if(data.fast_ema < data.slow_ema && data.fast_ema <= data.previous_fast_ema &&
-                 (data.previous.high >= data.previous_fast_ema || data.bar.high >= data.fast_ema) &&
+                 (data.previous.high >= data.previous_fast_ema - pullback_zone || data.bar.high >= data.fast_ema - pullback_zone) &&
                  data.bar.close < data.fast_ema && data.bar.close < data.bar.open &&
                  (!UseRSIFilter || (data.rsi >= 25.0 && data.rsi <= 52.0)))
            {

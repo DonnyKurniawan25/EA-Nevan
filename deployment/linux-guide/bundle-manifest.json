@@ -12,22 +12,23 @@
   "original_protected_files_verified": 19,
   "files": {
     "EXPORT_DEMO20_STATE.ps1": "bd8a96e5100ea2f929ebb22d8078c45af622b8c5acdf7b64847677db57ce9725",
-    "Experts/GoldShield_DEMO20.ex5": "7e8f46b416f66f679aeeec42898c69c8f53bab7b99636bebcc4e9f06d35dc681",
+    "Experts/GoldShield_DEMO20.ex5": "61ab9ce15aaaa61a5e6eb33c92f6635131828a0fadd8583e846db51407d96ad1",
     "PANDUAN_SERVER_LINUX.md": "79b1a8c1341ce312f7df53dc6d64fa16947748337eb3beffa46d59820abf49c5",
     "README.md": "79b1a8c1341ce312f7df53dc6d64fa16947748337eb3beffa46d59820abf49c5",
     "config/SERVER_DEMO20.ini": "55927b795008c3242c309d29dc8b3ab0637292bd642f250b203d2c4de4774e23",
     "config/SETUP.ini": "43ed03ec8cc3f0dc270a9077e9e90aeb634b9d560d7da4d4d2cf35b3a4c884e1",
     "config/STAGE.ini": "c770228c784323c5de99f810bbfc4f647e9c84a5796058a4be9de9880a14ce7a",
     "migration-settings.example.json": "ba007525b07ebf9e0cf477dc861235b8f40543c2ff4f27bd2b0a885ce2011b5f",
-    "presets/DEMO20_BTCUSDm.set": "35cf403d96f39b8a939506af4562f540d4642bc817203b99d4d0bf260fddfb0a",
-    "presets/DEMO20_CURRENT.set": "7345a7336b9b030a1918137aa00f30c62b01b5781bd65801a8168577943c44fc",
-    "presets/DEMO20_SERVER_STAGE.set": "b321e2cf0dbeb931b526126569c76412ca9d27bcfde0fd23363f43a3dc79d193",
+    "presets/DEMO20_BTCUSDm.set": "b23475d5fcd86095547822fe5e0c5344beefc35abf2fe85fa65e6b1f9d07c365",
+    "presets/DEMO20_CURRENT.set": "1b2823ddc3e1f73a203923ed7238a0ac8a0fdbf3d03fa91c80ea158d1161043e",
+    "presets/DEMO20_SERVER_STAGE.set": "9dda1a47db8465e40fe11795e20ec73cff65346da8406e9a8724f070fba429ef",
     "runtime.env": "0bdeb3f44dccb3030e741d931ae1fb5f006839acf11927f7332f46e2b256c221",
     "runtime/goldshield-desktop.service": "42654fee0fae5106af77c04dc30eee6b469bdaf1b907df66c091eec6d523ca1e",
     "runtime/goldshield-mt5.service": "f39a9415807179bb16b8179b4f5714f0f655be2f0b4bdad5975bc06ec9d50901",
     "runtime/import-frozen-state.py": "97560b03d8ce8574f1ebf42065900cbbcba8c6533caa3b97f6955adb39261b3b",
     "runtime/start-mt5.sh": "2d305cede34e2081a644f71e7195c671ecd94f4c15289c69f6630a2eee30e099",
-    "runtime/vnc-xstartup": "418ebf277e3e7fa24deff7f57d06b60bda79b43d4cedbabdafcab8329af87e3a"
+    "runtime/vnc-xstartup": "418ebf277e3e7fa24deff7f57d06b60bda79b43d4cedbabdafcab8329af87e3a",
+    "presets/EXNESS_CENT_USD10.set": "299adecb921731b37b5b751a76094a37680ea08b2ea1de64f2f3d054a7e49386"
   },
   "distribution": "GitHub source plus verified runtime templates; no live account state"
 }
