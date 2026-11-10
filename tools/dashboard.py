@@ -1476,12 +1476,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="section-header">
                 <div>
                     <h2>⚡ Posisi Aktif Berjalan (Live)</h2>
-                    <p class="section-desc">Transaksi yang saat ini sedang floating di pasar dan diawasi Trailing Stop</p>
-                </div>
-                <div id="btn-close-all-wrapper" style="display:none;">
-                    <button onclick="closeTrade('all')" style="background:#dc2626; color:#fff; border:none; padding:7px 14px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(220,38,38,0.3);">
-                        <span>🛑</span> Tutup Semua Posisi
-                    </button>
+                    <p class="section-desc">Transaksi yang saat ini sedang floating di pasar</p>
                 </div>
             </div>
             <div class="table-responsive">
@@ -1497,12 +1492,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <th>Stop Loss</th>
                             <th>Take Profit</th>
                             <th>Floating Profit</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-positions">
                         <tr>
-                            <td colspan="10">
+                            <td colspan="9">
                                 <div class="empty-state">
                                     <div class="empty-icon">☕</div>
                                     <div class="empty-title">Tidak Ada Posisi Terbuka Saat Ini</div>
@@ -2380,12 +2374,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <div class="trade-guard-item"><strong>Trailing Stop:</strong> Aktif Terpasang</div>
                                 <div class="trade-guard-item"><strong>Break-Even Lock:</strong> +0.2 ATR Kunci Modal</div>
                             </div>
-                            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed ${typeBorder}; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                                <span style="font-size:0.78rem; color:var(--text-sub);">💡 Interaksi manual mandiri:</span>
-                                <button onclick="closeTrade('${p.ticket}')" style="background:#ef4444; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-weight:700; cursor:pointer; font-size:0.78rem; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(239,68,68,0.25);">
-                                    <span>🛑</span> Tutup Posisi Tiket #${p.ticket}
-                                </button>
-                            </div>
                         </div>`;
                     });
                     activeTradesBox.innerHTML = tradesHtml;
@@ -2432,11 +2420,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // 3. Render Positions Table
             const tbodyPos = document.getElementById('tbody-positions');
-            const btnCloseAllWrapper = document.getElementById('btn-close-all-wrapper');
-            if (btnCloseAllWrapper) btnCloseAllWrapper.style.display = pos.length > 0 ? 'block' : 'none';
 
             if (pos.length === 0) {
-                tbodyPos.innerHTML = `<tr><td colspan="10">
+                tbodyPos.innerHTML = `<tr><td colspan="9">
                     <div class="empty-state">
                         <div class="empty-icon">☕</div>
                         <div class="empty-title">Tidak Ada Posisi Terbuka Saat Ini</div>
@@ -2463,11 +2449,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <td class="mono">${p.sl}</td>
                         <td class="mono">${p.tp}</td>
                         <td class="mono ${pnlClass}"><strong>${formatProfit(pnl)}</strong></td>
-                        <td>
-                            <button onclick="closeTrade('${p.ticket}')" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:4px; padding:3px 8px; font-size:0.75rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
-                                <span>🛑</span> Tutup
-                            </button>
-                        </td>
                     </tr>`;
                 });
                 tbodyPos.innerHTML = html;
