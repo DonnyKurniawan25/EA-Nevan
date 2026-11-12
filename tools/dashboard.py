@@ -1265,6 +1265,78 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 padding: 10px 12px;
                 font-size: 0.78rem;
             }
+            .pagination-bar {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+                gap: 10px;
+                padding: 10px 14px;
+            }
+            .pagination-controls {
+                justify-content: center;
+                width: 100%;
+            }
+        }
+
+        /* PAGINATION */
+        .pagination-bar {
+            padding: 12px 20px;
+            background: #fafcff;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pagination-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+        .pagination-label select {
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--surface);
+            color: var(--text-main);
+            font-size: 0.82rem;
+            outline: none;
+            cursor: pointer;
+        }
+        .page-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 5px 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .page-btn:hover:not(:disabled) {
+            background: var(--surface-subtle);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .page-current {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text-main);
+            padding: 0 4px;
         }
     </style>
 </head>
@@ -1514,7 +1586,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="section-header">
                 <div>
                     <h2>📜 Riwayat Transaksi Selesai</h2>
-                    <p class="section-desc">Daftar transaksi tertutup beserta hasil keuntungan/kerugian riil</p>
+                    <p class="section-desc">Daftar transaksi tertutup beserta hasil keuntungan/kerugian riil (terbaru di atas)</p>
                 </div>
             </div>
             <div class="table-responsive">
@@ -1542,6 +1614,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="pagination-bar" id="deals-pagination" style="display:none;">
+                <div class="pagination-info" id="deals-pagination-info">Menampilkan 0 - 0 dari 0 transaksi</div>
+                <div class="pagination-controls">
+                    <label class="pagination-label">Per hal:
+                        <select id="deals-per-page" onchange="changeDealsPerPage(this.value)">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </label>
+                    <button type="button" class="page-btn" id="deals-prev-btn" onclick="changeDealsPage(-1)">‹ Prev</button>
+                    <span class="page-current" id="deals-page-indicator">1 / 1</span>
+                    <button type="button" class="page-btn" id="deals-next-btn" onclick="changeDealsPage(1)">Next ›</button>
+                </div>
             </div>
         </div>
 
@@ -1605,6 +1693,87 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let currentTab = 'positions';
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token') || '';
+
+        // Deals Pagination State
+        let dealsPage = 1;
+        let dealsPerPage = 10;
+        let cachedDeals = [];
+
+        function changeDealsPerPage(val) {
+            dealsPerPage = parseInt(val, 10) || 10;
+            dealsPage = 1;
+            renderDealsTable(cachedDeals);
+        }
+
+        function changeDealsPage(delta) {
+            const total = cachedDeals.length;
+            const totalPages = Math.ceil(total / dealsPerPage) || 1;
+            const newPage = dealsPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                dealsPage = newPage;
+                renderDealsTable(cachedDeals);
+            }
+        }
+
+        function renderDealsTable(deals) {
+            cachedDeals = deals || [];
+            const tbodyDeals = document.getElementById('tbody-deals');
+            const paginationBar = document.getElementById('deals-pagination');
+            if (!cachedDeals || cachedDeals.length === 0) {
+                if (tbodyDeals) {
+                    tbodyDeals.innerHTML = `<tr><td colspan="7">
+                        <div class="empty-state">
+                            <div class="empty-icon">📂</div>
+                            <div class="empty-title">Belum Ada Riwayat Transaksi Selesai</div>
+                            <div class="empty-sub">Riwayat deal tertutup akan otomatis muncul di sini.</div>
+                        </div>
+                    </td></tr>`;
+                }
+                if (paginationBar) paginationBar.style.display = 'none';
+                return;
+            }
+
+            if (paginationBar) paginationBar.style.display = 'flex';
+            const total = cachedDeals.length;
+            const totalPages = Math.ceil(total / dealsPerPage) || 1;
+            if (dealsPage > totalPages) dealsPage = totalPages;
+            if (dealsPage < 1) dealsPage = 1;
+
+            const startIdx = (dealsPage - 1) * dealsPerPage;
+            const endIdx = Math.min(startIdx + dealsPerPage, total);
+            const pageDeals = cachedDeals.slice(startIdx, endIdx);
+
+            let html = '';
+            pageDeals.forEach(d => {
+                const isBuy = (d.type || '').toUpperCase() === 'BUY';
+                const pnl = parseFloat(d.profit) || 0;
+                const isWin = pnl > 0;
+                html += `<tr>
+                    <td class="mono" style="font-size:0.75rem;">${d.time || d.close_time || '-'}</td>
+                    <td class="mono">#${d.ticket || d.order || d.deal || '-'}</td>
+                    <td><strong>${d.symbol || 'XAUUSDm'}</strong></td>
+                    <td><span class="pill ${isBuy ? 'pill-buy' : 'pill-sell'}">${d.type || 'TRADE'}</span></td>
+                    <td class="mono">${d.volume || d.lots || '0.01'}</td>
+                    <td><span class="pill pill-neutral">${d.reason || d.comment || 'CLOSED'}</span></td>
+                    <td class="mono ${isWin ? 'val-profit' : (pnl < 0 ? 'val-loss' : '')}">
+                        <strong>${formatProfit(pnl)}</strong>
+                    </td>
+                </tr>`;
+            });
+            if (tbodyDeals) tbodyDeals.innerHTML = html;
+
+            const infoEl = document.getElementById('deals-pagination-info');
+            if (infoEl) infoEl.textContent = `Menampilkan ${startIdx + 1} - ${endIdx} dari ${total} transaksi`;
+
+            const indicatorEl = document.getElementById('deals-page-indicator');
+            if (indicatorEl) indicatorEl.textContent = `${dealsPage} / ${totalPages}`;
+
+            const prevBtn = document.getElementById('deals-prev-btn');
+            if (prevBtn) prevBtn.disabled = (dealsPage <= 1);
+
+            const nextBtn = document.getElementById('deals-next-btn');
+            if (nextBtn) nextBtn.disabled = (dealsPage >= totalPages);
+        }
 
         // Operator PIN State & Management
         let operatorPin = sessionStorage.getItem('goldshield_trading_pin') || '';
@@ -2453,37 +2622,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 tbodyPos.innerHTML = html;
             }
 
-            // 4. Render Deals Table
-            const tbodyDeals = document.getElementById('tbody-deals');
-            const deals = data.deals || [];
-            if (deals.length === 0) {
-                tbodyDeals.innerHTML = `<tr><td colspan="7">
-                    <div class="empty-state">
-                        <div class="empty-icon">📂</div>
-                        <div class="empty-title">Belum Ada Riwayat Transaksi Selesai</div>
-                        <div class="empty-sub">Riwayat deal tertutup akan otomatis muncul di sini.</div>
-                    </div>
-                </td></tr>`;
-            } else {
-                let html = '';
-                deals.forEach(d => {
-                    const isBuy = (d.type || '').toUpperCase() === 'BUY';
-                    const pnl = parseFloat(d.profit) || 0;
-                    const isWin = pnl > 0;
-                    html += `<tr>
-                        <td class="mono" style="font-size:0.75rem;">${d.time || d.close_time || '-'}</td>
-                        <td class="mono">#${d.ticket || d.order || d.deal || '-'}</td>
-                        <td><strong>${d.symbol || 'BTCUSDm'}</strong></td>
-                        <td><span class="pill ${isBuy ? 'pill-buy' : 'pill-sell'}">${d.type || 'TRADE'}</span></td>
-                        <td class="mono">${d.volume || d.lots || '0.01'}</td>
-                        <td><span class="pill pill-neutral">${d.reason || d.comment || 'CLOSED'}</span></td>
-                        <td class="mono ${isWin ? 'val-profit' : (pnl < 0 ? 'val-loss' : '')}">
-                            <strong>${formatProfit(pnl)}</strong>
-                        </td>
-                    </tr>`;
-                });
-                tbodyDeals.innerHTML = html;
-            }
+            // 4. Render Deals Table (dengan Paginasi & Urut Terbaru)
+            renderDealsTable(data.deals || []);
 
             // 5. Render Audit Logs Table
             const tbodyAudit = document.getElementById('tbody-audit');
@@ -2631,7 +2771,7 @@ def get_latest_data():
     deal_file = DATA_DIR / "history_deals.csv"
     deals = parse_csv_file(deal_file)
     if deals:
-        deals.reverse()
+        deals.sort(key=lambda d: (d.get("time", ""), d.get("deal", "")), reverse=True)
         data["deals"] = deals
     else:
         # Fallback parse from GS2.*.csv
@@ -2680,7 +2820,7 @@ def get_latest_data():
         if "5009061573" in trade_map: trade_map["5009061573"]["profit"] = "+0.72"
 
         deal_list = list(trade_map.values())
-        deal_list.reverse()
+        deal_list.sort(key=lambda d: (d.get("close_time", "") or d.get("time", ""), d.get("ticket", "")), reverse=True)
         data["deals"] = deal_list
 
     # 5. Parse latest GS2.*.csv for audit logs
