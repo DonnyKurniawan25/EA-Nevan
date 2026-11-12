@@ -113,18 +113,25 @@ bool GSReadLossBudget(const double reference,const double equity,GSLossBudget &b
    int effective_streak_limit=MaxConsecutiveLossesPerDay;
    if(UseFastScalperBasket && BasketLayers>1)
       effective_streak_limit=MaxConsecutiveLossesPerDay*BasketLayers;
-   if(budget.loss_streak>=effective_streak_limit) return GSReject(reason,"HOLD_DAILY_LOSS_STREAK");
-   if(budget.daily_net<=-reference*MaxDailyLossPct/100.0) return GSReject(reason,"HOLD_DAILY_LOSS_LIMIT");
-   if(budget.weekly_net<=-reference*MaxWeeklyLossPct/100.0) return GSReject(reason,"HOLD_WEEKLY_LOSS_LIMIT");
-   if(UseDailyProfitLock && reference>0.0)
+   if(!UseFastScalperBasket && budget.loss_streak>=effective_streak_limit) return GSReject(reason,"HOLD_DAILY_LOSS_STREAK");
+   if(!UseFastScalperBasket && budget.daily_net<=-reference*MaxDailyLossPct/100.0) return GSReject(reason,"HOLD_DAILY_LOSS_LIMIT");
+   if(!UseFastScalperBasket && budget.weekly_net<=-reference*MaxWeeklyLossPct/100.0) return GSReject(reason,"HOLD_WEEKLY_LOSS_LIMIT");
+   if(!UseFastScalperBasket && UseDailyProfitLock && reference>0.0)
      {
       double target_gain=(DailyProfitTargetPct>0.0) ? (reference*DailyProfitTargetPct/100.0) : DailyProfitTargetUSD;
       if(target_gain>0.0 && budget.daily_net>=target_gain)
          return GSReject(reason,"HOLD_DAILY_PROFIT_TARGET_REACHED");
      }
-   budget.available=GSLossAllowance(reference,equity,EquityShieldMinPctOfReference,
-                                   MaxDailyLossPct,MaxWeeklyLossPct,budget.daily_net,budget.weekly_net);
-   if(!GSPositive(budget.available)) return GSReject(reason,"HOLD_LOSS_HEADROOM_EXHAUSTED");
+   if(!UseFastScalperBasket)
+     {
+      budget.available=GSLossAllowance(reference,equity,EquityShieldMinPctOfReference,
+                                      MaxDailyLossPct,MaxWeeklyLossPct,budget.daily_net,budget.weekly_net);
+      if(!GSPositive(budget.available)) return GSReject(reason,"HOLD_LOSS_HEADROOM_EXHAUSTED");
+     }
+   else
+     {
+      budget.available=equity;
+     }
    return true;
   }
 #endif

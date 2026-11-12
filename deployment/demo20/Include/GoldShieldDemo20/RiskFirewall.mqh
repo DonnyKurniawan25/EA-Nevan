@@ -174,8 +174,20 @@ public:
       if(UseFastScalperBasket && GSPositive(BasketCutLossUSC))
         {
          double per_unit=0.0;
-         if(!OrderCalcProfit(ORDER_TYPE_BUY,spec.symbol,BaseLot,plan.entry,plan.entry+1.0,per_unit) || !GSPositive(per_unit))
+         ResetLastError();
+         bool calc_ok=OrderCalcProfit(ORDER_TYPE_BUY,spec.symbol,BaseLot,plan.entry,plan.entry+10.0,per_unit);
+         if(calc_ok && per_unit>0.0) per_unit=per_unit/10.0;
+         double tick_val=SymbolInfoDouble(spec.symbol,SYMBOL_TRADE_TICK_VALUE);
+         double tick_sz=SymbolInfoDouble(spec.symbol,SYMBOL_TRADE_TICK_SIZE);
+         double contract_sz=SymbolInfoDouble(spec.symbol,SYMBOL_TRADE_CONTRACT_SIZE);
+         if(!GSPositive(per_unit) && GSPositive(tick_val) && GSPositive(tick_sz))
+            per_unit=(1.0/tick_sz)*tick_val*BaseLot;
+         if(!GSPositive(per_unit))
+           {
+            PrintFormat("GOLDSHIELD DEBUG BASKET_STOP: calc_ok=%s per_unit=%.6f err=%d symbol=%s BaseLot=%.4f entry=%.3f tick_val=%.6f tick_sz=%.6f contract=%.2f",
+                        (calc_ok?"true":"false"),per_unit,GetLastError(),spec.symbol,BaseLot,plan.entry,tick_val,tick_sz,contract_sz);
             return GSReject(reason,"BASKET_STOP_CALCULATION_FAILED");
+           }
          double dist=MathMax(BasketCutLossUSC*1.2/(BasketLayers*per_unit),minimum);
          plan.sl=(buy ? GSTickDown(plan.entry-dist,spec.tick_size,spec.digits) : GSTickUp(plan.entry+dist,spec.tick_size,spec.digits));
          plan.tp=(buy ? GSTickUp(plan.entry+dist*effective_rr,spec.tick_size,spec.digits) : GSTickDown(plan.entry-dist*effective_rr,spec.tick_size,spec.digits));
@@ -186,6 +198,13 @@ public:
       double reference_profit=0.0;
       if(!OrderCalcProfit(type,spec.symbol,spec.volume_min,plan.entry,plan.sl,reference_profit) ||
          !MathIsValidNumber(reference_profit) || reference_profit>=0.0)
+        {
+         double tv=SymbolInfoDouble(spec.symbol,SYMBOL_TRADE_TICK_VALUE);
+         double ts=SymbolInfoDouble(spec.symbol,SYMBOL_TRADE_TICK_SIZE);
+         if(GSPositive(tv) && GSPositive(ts))
+            reference_profit=-(MathAbs(plan.entry-plan.sl)/ts)*tv*spec.volume_min;
+        }
+      if(!MathIsValidNumber(reference_profit) || reference_profit>=0.0)
          return GSReject(reason,"STOP_LOSS_CALCULATION_FAILED");
       double loss_per_lot=-reference_profit/spec.volume_min;
       double max_allowed=MaxTotalAccountLots-account_lots;
