@@ -107,8 +107,13 @@ bool GSReadLossBudget(const double reference,const double equity,GSLossBudget &b
       if(budget.daily_net>=-1e-8)
          effective_max_entries=MaxDynamicEntriesPerDay;
      }
-   if(budget.entries_today>=effective_max_entries) return GSReject(reason,"HOLD_DAILY_ENTRY_LIMIT");
-   if(budget.loss_streak>=MaxConsecutiveLossesPerDay) return GSReject(reason,"HOLD_DAILY_LOSS_STREAK");
+   if(UseFastScalperBasket && BasketLayers>1)
+      effective_max_entries*=BasketLayers;
+   if(!UseFastScalperBasket && budget.entries_today>=effective_max_entries) return GSReject(reason,"HOLD_DAILY_ENTRY_LIMIT");
+   int effective_streak_limit=MaxConsecutiveLossesPerDay;
+   if(UseFastScalperBasket && BasketLayers>1)
+      effective_streak_limit=MaxConsecutiveLossesPerDay*BasketLayers;
+   if(budget.loss_streak>=effective_streak_limit) return GSReject(reason,"HOLD_DAILY_LOSS_STREAK");
    if(budget.daily_net<=-reference*MaxDailyLossPct/100.0) return GSReject(reason,"HOLD_DAILY_LOSS_LIMIT");
    if(budget.weekly_net<=-reference*MaxWeeklyLossPct/100.0) return GSReject(reason,"HOLD_WEEKLY_LOSS_LIMIT");
    if(UseDailyProfitLock && reference>0.0)

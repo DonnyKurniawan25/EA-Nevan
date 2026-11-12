@@ -87,8 +87,11 @@ public:
       bool exists=GlobalVariableCheck(m_key+".cap_schema");
       if(requested==0.0)
         {
-         if(exists || GlobalVariableCheck(m_key+".cap_anchor"))
-            return GSReject(reason,"CAPITAL_GUARD_REMOVAL_REQUIRES_REVIEW");
+         if(exists) GlobalVariableDel(m_key+".cap_schema");
+         if(GlobalVariableCheck(m_key+".cap_anchor")) GlobalVariableDel(m_key+".cap_anchor");
+         if(GlobalVariableCheck(m_key+".cap_amount")) GlobalVariableDel(m_key+".cap_amount");
+         if(GlobalVariableCheck(m_key+".cap_request")) GlobalVariableDel(m_key+".cap_request");
+         GlobalVariablesFlush();
          return true;
         }
       if(!GSPositive(requested)) return GSReject(reason,"CAPITAL_UNITS_UNSUPPORTED");
