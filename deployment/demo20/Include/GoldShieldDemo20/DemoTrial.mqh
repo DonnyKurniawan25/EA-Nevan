@@ -149,14 +149,16 @@ void GSDemo20Status(GSStorage &store,const GSOwnedPosition &owned,GSStateMachine
    static datetime last=0;
    static string signature="";
    static bool complete=false;
-   if(complete && owned.count==0 && store.Get(".d20.used")>=GS_DEMO20_LIMIT) return;
+   bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC");
+   bool enforce_demo_limit=(!is_cent && !UseFastScalperBasket);
+   if(enforce_demo_limit && complete && owned.count==0 && store.Get(".d20.used")>=GS_DEMO20_LIMIT) return;
    datetime now=TimeTradeServer();
    if(now==last) return;
    last=now;
    int entries,closed,wins,losses; double net;
    bool history=GS20History(TradeSymbol,MagicNumber,entries,closed,wins,losses,net);
    int used=(int)store.Get(".d20.used");
-   string trial=(used>=GS_DEMO20_LIMIT ? (owned.count>0 ? "LIMIT_REACHED_MANAGING_LAST_POSITION" : "LIMIT_REACHED_FLAT") : "RUNNING_WAIT_VALID_SIGNAL");
+   string trial=(enforce_demo_limit && used>=GS_DEMO20_LIMIT ? (owned.count>0 ? "LIMIT_REACHED_MANAGING_LAST_POSITION" : "LIMIT_REACHED_FLAT") : "RUNNING_WAIT_VALID_SIGNAL");
    if(!history) trial="HISTORY_UNAVAILABLE_REVIEW_REQUIRED";
    g_demo20_panel=StringFormat("UJI DEMO: %d/20 pengiriman | %d selesai | menang %d / rugi %d\nNet tertutup %.2f %s | %s",
                              used,closed,wins,losses,net,AccountInfoString(ACCOUNT_CURRENCY),trial);
