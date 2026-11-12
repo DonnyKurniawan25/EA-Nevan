@@ -100,7 +100,7 @@ input group "FAST SCALPER BASKET - Keranjang Cuan Cepat"
 input bool   UseFastScalperBasket=false;     // Mode Fast Scalper Basket (pasang N layer, tutup saat biru)
 input int    BasketLayers=5;                 // Jumlah layer simultan per sinyal (default: 5 posisi)
 input double BasketTakeProfitUSC=5.0;        // Target profit keranjang total (5.0 USC -> biru langsung jual)
-input double BasketCutLossUSC=20.0;          // Cut-loss keranjang darurat (20.0 USC)
+input double BasketCutLossUSC=30.0;          // Cut-loss keranjang darurat (30.0 USC)
 input int    BasketCooldownMinutes=1;        // Jeda tunggu setelah basket ditutup (1 menit)
 input double BasketLayerStepATR=0.0;         // Jarak antar layer dalam ATR (0.0 = pasang 5 sekaligus bersamaan)
 
