@@ -346,8 +346,8 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
-   // Rule 2: Partial Take Profit, Break-Even Protection & Dynamic ATR Trailing Stop
-   if((UseBreakEvenProtection || UseTrailingStop || UsePartialTakeProfit) && g_owned.count>0)
+   // Rule 2: Partial Take Profit, Break-Even Protection & Dynamic ATR Trailing Stop (Bypassed for Fast Scalper Basket)
+   if(!UseFastScalperBasket && (UseBreakEvenProtection || UseTrailingStop || UsePartialTakeProfit) && g_owned.count>0)
      {
       GSMarketSnapshot data;
       string m_reason="";
@@ -568,9 +568,9 @@ void GSProcess(const bool evaluate_signal)
         }
      }
 
-   // Rule 3: Early Reversal Exit & RSI Overbought/Oversold Profit Protector
+   // Rule 3: Early Reversal Exit & RSI Overbought/Oversold Profit Protector (Bypassed for Fast Scalper Basket)
    datetime current_bar=iTime(TradeSymbol,SignalTimeframe,0);
-   if(g_owned.count>0 && current_bar>0 && current_bar!=g_observed_exit_bar)
+   if(!UseFastScalperBasket && g_owned.count>0 && current_bar>0 && current_bar!=g_observed_exit_bar)
      {
       g_observed_exit_bar=current_bar;
       GSMarketSnapshot data;

@@ -170,6 +170,16 @@ public:
          plan.sl=GSTickUp(MathMax(raw,tick.ask+minimum),spec.tick_size,spec.digits);
          plan.tp=GSTickDown(plan.entry-(plan.sl-plan.entry)*effective_rr,spec.tick_size,spec.digits);
         }
+      // Basket: server SL = backup 1.2x basket cut-loss, so floating red waits for EA basket TP/cut-loss.
+      if(UseFastScalperBasket && GSPositive(BasketCutLossUSC))
+        {
+         double per_unit=0.0;
+         if(!OrderCalcProfit(ORDER_TYPE_BUY,spec.symbol,BaseLot,plan.entry,plan.entry+1.0,per_unit) || !GSPositive(per_unit))
+            return GSReject(reason,"BASKET_STOP_CALCULATION_FAILED");
+         double dist=MathMax(BasketCutLossUSC*1.2/(BasketLayers*per_unit),minimum);
+         plan.sl=(buy ? GSTickDown(plan.entry-dist,spec.tick_size,spec.digits) : GSTickUp(plan.entry+dist,spec.tick_size,spec.digits));
+         plan.tp=(buy ? GSTickUp(plan.entry+dist*effective_rr,spec.tick_size,spec.digits) : GSTickDown(plan.entry-dist*effective_rr,spec.tick_size,spec.digits));
+        }
       if(!GSValidStops(buy,plan.entry,tick.bid,tick.ask,plan.sl,plan.tp,minimum))
          return GSReject(reason,"INVALID_SERVER_STOP_OR_TARGET");
       ENUM_ORDER_TYPE type=(buy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL);
