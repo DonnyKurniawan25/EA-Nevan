@@ -27,6 +27,8 @@ LABELS = {
     "RSI_EXTREME_PROFIT_EXIT": "Amankan keuntungan: Pucuk RSI ekstrim tercapai",
     "MANUAL_CLOSE": "👤 POSISI DITUTUP MANUAL (VIA DASHBOARD)",
     "MANUAL_ORDER": "⚡ POSISI DIBUKA MANUAL (VIA DASHBOARD)",
+    "BASKET_PROFIT_EXIT": "🎯 KERANJANG CUAN TERCAPAI (Semua layer ditutup)",
+    "BASKET_CUT_LOSS_EXIT": "🛑 KERANJANG CUT-LOSS PENGAMAN (Semua layer ditutup)",
 }
 ALERT_STATES = {"PAUSED_RISK", "ERROR_BLOCKED", "SAFE_MODE", "PAUSED_MANUAL", "PAUSED_VOLATILITY"}
 REASONS = set("""BASELINE_RULES RECONCILIATION_REQUIRED BROKER_PREFLIGHT_REJECTED BROKER_POSITION_PRESENT
@@ -44,9 +46,12 @@ STEPPED_PROFIT_LOCK RSI_EXTREME_PROFIT_EXIT RSI_OVERBOUGHT_EXHAUSTION RSI_OVERSO
 HOLD_HTF_SLOPE_FLAT_OR_FALLING HOLD_HTF_SLOPE_FLAT_OR_RISING
 MIDNIGHT_ROLLOVER_EXIT SWAP_AND_SPREAD_PREVENTION MIDNIGHT_PROFIT_CLOSE
 MANUAL_CLOSE DASHBOARD_USER_COMMAND MANUAL_DASHBOARD_CLOSE
-MANUAL_ORDER DASHBOARD_COMMAND""".split())
+MANUAL_ORDER DASHBOARD_COMMAND
+BASKET_PROFIT_EXIT BASKET_CUT_LOSS_EXIT BASKET_TARGET_PROFIT_REACHED BASKET_EMERGENCY_CUT_LOSS FAST_SCALPER_BASKET BASKET_LAYER_SUBMITTED AUTO_RECOVER FINANCES_HEALTHY""".split())
 
 EVENT_ICONS = {
+    "BASKET_PROFIT_EXIT": "🎯",
+    "BASKET_CUT_LOSS_EXIT": "🛑",
     "SIGNAL": "🔔",
     "ORDER_INTENT": "📝",
     "ORDER_RESULT": "📤",
@@ -131,6 +136,11 @@ REASON_DESCRIPTIONS = {
     "WEEKEND_GAP_PREVENTION": "Penutupan otomatis sebelum bursa emas/forex tutup",
     "DISCONNECTED_SERVER_STOPS_ONLY": "Koneksi terputus (Stop Loss server aktif)",
     "EQUITY_REFERENCE_FLOOR": "Batas pengaman modal minimum",
+    "BASKET_TARGET_PROFIT_REACHED": "Target profit keranjang tercapai (biru langsung jual serentak)",
+    "BASKET_EMERGENCY_CUT_LOSS": "Batas cut-loss keranjang darurat tersentuh (proteksi modal)",
+    "FAST_SCALPER_BASKET": "Mode Fast Scalper Basket aktif (multi-layer 0.01 lot)",
+    "BASKET_LAYER_SUBMITTED": "Layer keranjang scalper berhasil dikirim ke broker",
+    "FINANCES_HEALTHY": "Finansial akun telah kembali sehat dan aman",
 }
 
 KEY_TRANSLATIONS = {
@@ -149,6 +159,10 @@ KEY_TRANSLATIONS = {
     "margin_est": "Estimasi Margin",
     "close_vol": "Volume Ditutup",
     "adx": "Kekuatan Tren (ADX)",
+    "layers": "Jumlah Layer",
+    "total_pl": "Total P/L Keranjang",
+    "target": "Target Profit",
+    "cut_loss": "Batas Cut-Loss",
 }
 
 

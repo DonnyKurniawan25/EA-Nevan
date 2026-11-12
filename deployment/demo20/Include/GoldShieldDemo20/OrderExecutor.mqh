@@ -33,7 +33,9 @@ public:
             (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
             count_owned++;
         }
-      if(count_owned>=MaxAccountPositions)
+      int target_orders=(UseFastScalperBasket ? BasketLayers : 1);
+      if(target_orders<1) target_orders=1;
+      if(count_owned+target_orders>MaxAccountPositions)
          return GSReject(reason,"PRE_SEND_BASKET_ALREADY_EXISTS");
       if(OrdersTotal()>0) return GSReject(reason,"PRE_SEND_PENDING_ORDER_EXISTS");
       MqlTradeRequest request={};
@@ -61,18 +63,31 @@ public:
          (check.margin>0.0 && check.equity/check.margin*100.0<MinMarginLevelPct))
          return GSReject(reason,"BROKER_PREFLIGHT_MARGIN_LIMIT");
       if(!store.BeginEntry(plan.candle_id)) return GSReject(reason,"DURABLE_ENTRY_INTENT_FAILED");
-      log.Event("ORDER_INTENT","BASELINE_RULES",StringFormat("lots=%.8f entry=%.8f sl=%.8f tp=%.8f budget=%.2f risk_est=%.2f margin_est=%.2f",
-                plan.volume,plan.entry,plan.sl,plan.tp,plan.risk_budget,plan.estimated_loss,plan.estimated_margin),plan.candle_id);
+      log.Event("ORDER_INTENT","BASELINE_RULES",StringFormat("layers=%d lots=%.8f entry=%.8f sl=%.8f tp=%.8f budget=%.2f risk_est=%.2f margin_est=%.2f",
+                target_orders,plan.volume,plan.entry,plan.sl,plan.tp,plan.risk_budget,plan.estimated_loss,plan.estimated_margin),plan.candle_id);
       if(!log.Healthy()) return GSReject(reason,"ORDER_INTENT_AUDIT_WRITE_FAILED");
       m_trade.SetTypeFilling(plan.filling);
-      if(!GSDemo20Reserve(store,reason)) return false;
-      bool sent=m_trade.PositionOpen(TradeSymbol,request.type,plan.volume,plan.entry,plan.sl,plan.tp,plan.comment);
-      uint code=m_trade.ResultRetcode();
-      log.Event("ORDER_RESULT","RECONCILIATION_REQUIRED",StringFormat("method=%s retcode=%u order=%I64u deal=%I64u filled_volume=%.8f filled_price=%.8f",
-                (sent ? "true" : "false"),code,m_trade.ResultOrder(),m_trade.ResultDeal(),m_trade.ResultVolume(),m_trade.ResultPrice()),plan.candle_id);
-      // A true return, DONE or DONE_PARTIAL is not a position snapshot confirmation.
+      int filled_count=0;
+      for(int k=0;k<target_orders;k++)
+        {
+         if(!GSDemo20Reserve(store,reason))
+           {
+            if(k==0) return false;
+            break;
+           }
+         MqlTick cur_tick;
+         double entry_p=plan.entry;
+         if(SymbolInfoTick(TradeSymbol,cur_tick))
+            entry_p=(plan.side==GS_BUY ? cur_tick.ask : cur_tick.bid);
+         bool sent=m_trade.PositionOpen(TradeSymbol,request.type,plan.volume,entry_p,plan.sl,plan.tp,plan.comment);
+         uint code=m_trade.ResultRetcode();
+         if(sent || code==10009 || code==10008) filled_count++;
+         log.Event("ORDER_RESULT",(target_orders>1 ? "BASKET_LAYER_SUBMITTED" : "RECONCILIATION_REQUIRED"),
+                   StringFormat("layer=%d/%d method=%s retcode=%u order=%I64u deal=%I64u filled_volume=%.8f filled_price=%.8f",
+                                k+1,target_orders,(sent ? "true" : "false"),code,m_trade.ResultOrder(),m_trade.ResultDeal(),m_trade.ResultVolume(),m_trade.ResultPrice()),plan.candle_id);
+        }
       reason="ENTRY_INTENT_AWAITING_BROKER_SNAPSHOT";
-      return true;
+      return (filled_count>0);
      }
    bool EmergencyClose(const ulong ticket,GSStorage &store,GSRiskFirewall &risk,
                        GSMetrics &log,string &reason)

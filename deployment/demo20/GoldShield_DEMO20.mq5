@@ -78,12 +78,13 @@ void GSProcess(const bool evaluate_signal)
      }
    if(g_owned.count==0 && g_owned.pending_orders==0 && g_storage.Get(".pending")<0.0)
      {
-      if(!g_storage.FinishClose(TimeTradeServer()+CooldownMinutes*60)) g_storage.Block();
+      int basket_cd=(UseFastScalperBasket ? BasketCooldownMinutes : CooldownMinutes);
+      if(!g_storage.FinishClose(TimeTradeServer()+basket_cd*60)) g_storage.Block();
       g_log.Event("EXIT_CONFIRMED","NO_RESIDUAL_EA_POSITION");
      }
    if(g_had_position && g_owned.count==0)
      {
-      int effective_cooldown=CooldownMinutes;
+      int effective_cooldown=(UseFastScalperBasket ? BasketCooldownMinutes : CooldownMinutes);
       double last_deal_profit=0.0;
       ulong last_pos_id=0;
       bool found_deal=false;
@@ -104,7 +105,7 @@ void GSProcess(const bool evaluate_signal)
               }
            }
         }
-      if(found_deal && last_deal_profit<0.0 && UseDynamicLossCooldown)
+      if(!UseFastScalperBasket && found_deal && last_deal_profit<0.0 && UseDynamicLossCooldown)
          effective_cooldown=LossCooldownMinutes;
       if(!g_storage.SetCooldown(TimeTradeServer()+effective_cooldown*60)) g_storage.Block();
       if(found_deal)
@@ -218,6 +219,46 @@ void GSProcess(const bool evaluate_signal)
             string open_reason="";
             g_executor.ManualOpen(TradeSymbol,req_type,ord_lot,ord_sl,ord_tp,"GS2|MANUAL_DASHBOARD",g_log,open_reason);
            }
+        }
+     }
+
+   // Rule -0.5: Fast Scalper Basket Profit & Emergency Cut-Loss Exit ("ketika biru langsung jual")
+   if(UseFastScalperBasket && g_owned.count>0)
+     {
+      double basket_pl=0.0;
+      int basket_owned_count=0;
+      ulong basket_tickets[];
+      for(int i=PositionsTotal()-1;i>=0;i--)
+        {
+         ulong t=PositionGetTicket(i);
+         if(t==0 || !PositionSelectByTicket(t)) continue;
+         if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+           {
+            double p_pl=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
+            basket_pl+=p_pl;
+            int sz=ArraySize(basket_tickets);
+            ArrayResize(basket_tickets,sz+1);
+            basket_tickets[sz]=t;
+            basket_owned_count++;
+           }
+        }
+      bool take_profit=(basket_pl>=BasketTakeProfitUSC);
+      bool cut_loss=(BasketCutLossUSC>0.0 && basket_pl<=-BasketCutLossUSC);
+      if(take_profit || cut_loss)
+        {
+         string b_action=(take_profit ? "BASKET_PROFIT_EXIT" : "BASKET_CUT_LOSS_EXIT");
+         string b_sub=(take_profit ? "BASKET_TARGET_PROFIT_REACHED" : "BASKET_EMERGENCY_CUT_LOSS");
+         g_log.Event(b_action,b_sub,StringFormat("positions=%d total_pl=%.2f target=%.2f cut_loss=%.2f",
+                     basket_owned_count,basket_pl,BasketTakeProfitUSC,BasketCutLossUSC));
+         for(int k=0;k<ArraySize(basket_tickets);k++)
+           {
+            ulong bt=basket_tickets[k];
+            string c_reason="";
+            g_executor.ClosePosition(bt,g_risk,g_log,c_reason,b_action);
+           }
+         g_state.Set(BASKET_EXITING,(take_profit ? "BASKET_PROFIT_EXIT" : "BASKET_CUT_LOSS_EXIT"),g_log);
+         g_processing=false;
+         return;
         }
      }
 
@@ -611,9 +652,11 @@ void GSProcess(const bool evaluate_signal)
    double margin=AccountInfoDouble(ACCOUNT_MARGIN);
    bool equity_alarm=reference==EMPTY_VALUE || !GSPositive(reference) || !GSPositive(equity) ||
                      equity<=reference*EquityShieldMinPctOfReference/100.0;
-   bool margin_alarm=margin>0.0 && equity/margin*100.0<MinMarginLevelPct;
+   bool is_cent_acct=(AccountInfoString(ACCOUNT_CURRENCY)=="USC");
+   double eff_min_margin=(is_cent_acct ? 150.0 : MinMarginLevelPct);
+   bool margin_alarm=margin>0.0 && equity/margin*100.0<eff_min_margin;
    bool position_alarm=g_owned.count>0 &&
-                       (!GSPositive(g_owned.sl) || g_owned.floating_pl<=-reference*MaxPositionLossPct/100.0);
+                       (!GSPositive(g_owned.sl) || (!UseFastScalperBasket && g_owned.floating_pl<=-reference*MaxPositionLossPct/100.0));
    // Latch once. Rewriting it and alternating two reasons on every tick can
    // flood disk/audit output after a stop; risk exits below still run each cycle.
    if((equity_alarm || margin_alarm || position_alarm) &&
@@ -626,16 +669,36 @@ void GSProcess(const bool evaluate_signal)
      }
    if(g_runtime_hard_block || g_storage.Get(".blocked")==2.0)
      {
-      g_state.Set(PAUSED_RISK,"PERSISTENT_HARD_RISK_LATCH",g_log);
-      if(g_owned.count==1)
+      if(g_owned.count==0 && !equity_alarm && !margin_alarm && GSPositive(equity) && equity>=reference*EquityShieldMinPctOfReference/100.0)
         {
-         if(g_executor.EmergencyClose(g_owned.ticket,g_storage,g_risk,g_log,reason))
-            g_state.Set(BASKET_EXITING,reason,g_log);
-         else g_state.Set(PAUSED_RISK,reason,g_log);
+         g_runtime_hard_block=false;
+         g_runtime_block=false;
+         g_storage.Set(".blocked",0.0);
+         g_storage.Set(".cap_anchor",equity);
+         g_storage.Set(".reference",equity);
+         g_state.Set(READY,"AUTO_RECOVERED_HEALTHY_FINANCES",g_log);
+         g_log.Event("AUTO_RECOVER","FINANCES_HEALTHY",StringFormat("equity=%.2f margin=%.2f reference=%.2f",equity,margin,reference));
         }
-      GSDemo20Status(g_storage,g_owned,g_state); GSDrawPanel(g_state,g_owned,g_signal,g_storage.Key());
-      g_processing=false;
-      return;
+      else
+        {
+         g_state.Set(PAUSED_RISK,"PERSISTENT_HARD_RISK_LATCH",g_log);
+         if(g_owned.count>=1)
+           {
+            for(int i=PositionsTotal()-1;i>=0;i--)
+              {
+               ulong t=PositionGetTicket(i);
+               if(t==0 || !PositionSelectByTicket(t)) continue;
+               if(PositionGetString(POSITION_SYMBOL)==TradeSymbol && (ulong)PositionGetInteger(POSITION_MAGIC)==MagicNumber)
+                 {
+                  g_executor.EmergencyClose(t,g_storage,g_risk,g_log,reason);
+                 }
+              }
+            g_state.Set(BASKET_EXITING,reason,g_log);
+           }
+         GSDemo20Status(g_storage,g_owned,g_state); GSDrawPanel(g_state,g_owned,g_signal,g_storage.Key());
+         g_processing=false;
+         return;
+        }
      }
    if(!g_log.Healthy())
      {

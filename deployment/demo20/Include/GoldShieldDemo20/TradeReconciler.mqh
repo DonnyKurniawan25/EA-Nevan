@@ -21,7 +21,7 @@ public:
          owned.ticket=ticket;
          owned.identifier=PositionGetInteger(POSITION_IDENTIFIER);
          owned.direction=PositionGetInteger(POSITION_TYPE);
-         owned.volume=PositionGetDouble(POSITION_VOLUME);
+         owned.volume+=PositionGetDouble(POSITION_VOLUME);
          owned.sl=PositionGetDouble(POSITION_SL);
          owned.floating_pl+=PositionGetDouble(POSITION_PROFIT)+PositionGetDouble(POSITION_SWAP);
          owned.opened_at=(datetime)PositionGetInteger(POSITION_TIME);

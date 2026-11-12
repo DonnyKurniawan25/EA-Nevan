@@ -181,6 +181,13 @@ public:
       double max_allowed=MaxTotalAccountLots-account_lots;
       double cap=(UseAutoLotByRisk ? (MaxLotPerTrade>0.0 ? MathMin(MaxLotPerTrade,max_allowed) : max_allowed)
                                    : MathMin(BaseLot,max_allowed));
+      bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC");
+      if(UseFastScalperBasket || is_cent)
+        {
+         double min_cost=loss_per_lot*(1.0+RiskBufferPct/100.0)*spec.volume_min+CostBufferPerLot*spec.volume_min;
+         if(plan.risk_budget<min_cost && equity>=reference*EquityShieldMinPctOfReference/100.0)
+            plan.risk_budget=min_cost;
+        }
       plan.volume=GSRiskVolume(plan.risk_budget,loss_per_lot,RiskBufferPct,CostBufferPerLot,
                               cap,spec.volume_min,spec.volume_max,spec.volume_step);
       if(plan.volume<=0.0) return GSReject(reason,"MINIMUM_LOT_EXCEEDS_RISK_OR_VOLUME_BUDGET");

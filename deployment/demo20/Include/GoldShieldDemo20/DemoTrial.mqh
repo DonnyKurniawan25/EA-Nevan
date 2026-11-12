@@ -98,18 +98,19 @@ bool GSDemo20Init(GSStorage &store,const string symbol,const ulong magic,string 
       return GSReject(reason,"DEMO20_REFUSES_ALL_REAL_ACCOUNTS");
    int entries,closed,wins,losses; double net;
    if(!GS20History(symbol,magic,entries,closed,wins,losses,net)) return GSReject(reason,"DEMO20_HISTORY_UNAVAILABLE");
-   if(entries>GS_DEMO20_LIMIT) return GSReject(reason,"DEMO20_HISTORY_EXCEEDS_LIMIT");
+   bool enforce_demo_limit=(!is_cent && !UseFastScalperBasket);
+   if(enforce_demo_limit && entries>GS_DEMO20_LIMIT) return GSReject(reason,"DEMO20_HISTORY_EXCEEDS_LIMIT");
    string base=store.Key()+".d20";
    if(!GlobalVariableCheck(base+".schema"))
      {
       if(GlobalVariableCheck(base+".used") || GlobalVariableCheck(base+".limit"))
          return GSReject(reason,"DEMO20_PARTIAL_STATE_REVIEW_REQUIRED");
-      if(entries>GS_DEMO20_LIMIT || !GS20Put(base+".used",entries) || !GS20Put(base+".limit",GS_DEMO20_LIMIT) ||
+      if((enforce_demo_limit && entries>GS_DEMO20_LIMIT) || !GS20Put(base+".used",entries) || !GS20Put(base+".limit",GS_DEMO20_LIMIT) ||
          !GS20Put(base+".schema",1)) return GSReject(reason,"DEMO20_STATE_INITIALIZATION_FAILED");
      }
    double used=store.Get(".d20.used");
    if(store.Get(".d20.schema")!=1 || store.Get(".d20.limit")!=GS_DEMO20_LIMIT ||
-      !MathIsValidNumber(used) || used<0 || used>GS_DEMO20_LIMIT || MathFloor(used)!=used)
+      !MathIsValidNumber(used) || used<0 || (enforce_demo_limit && used>GS_DEMO20_LIMIT) || MathFloor(used)!=used)
       return GSReject(reason,"DEMO20_INVALID_LIMIT_STATE");
    if(entries>used && !GS20Put(base+".used",entries)) return GSReject(reason,"DEMO20_HISTORY_SYNC_FAILED");
    return true;
@@ -127,7 +128,8 @@ bool GSDemo20CanEnter(GSStorage &store,string &reason)
    double used=store.Get(".d20.used");
    if(!MathIsValidNumber(used) || used<0 || MathFloor(used)!=used)
       return GSReject(reason,"DEMO20_COUNTER_INVALID");
-   if(used>=GS_DEMO20_LIMIT) return GSReject(reason,"DEMO20_LIMIT_REACHED_NO_MORE_ENTRIES");
+   bool enforce_demo_limit=(!is_cent && !UseFastScalperBasket);
+   if(enforce_demo_limit && used>=GS_DEMO20_LIMIT) return GSReject(reason,"DEMO20_LIMIT_REACHED_NO_MORE_ENTRIES");
    return true;
   }
 

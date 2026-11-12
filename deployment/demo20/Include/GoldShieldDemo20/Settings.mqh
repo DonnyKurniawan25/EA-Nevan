@@ -96,6 +96,14 @@ input bool UseVolatilityExpansionTP=true; // Perlebar TP runner ke 3.5 ATR saat 
 input bool UseAcceleratorTrailing=true; // Trailing akselerator agresif kunci laba cepat anti-koreksi
 input bool RequireBreakEvenForAddOn=true; // Zero-risk pyramiding: posisi ke-2 hanya jika posisi 1 sudah lock BE
 
+input group "FAST SCALPER BASKET - Keranjang Cuan Cepat"
+input bool   UseFastScalperBasket=false;     // Mode Fast Scalper Basket (pasang N layer, tutup saat biru)
+input int    BasketLayers=5;                 // Jumlah layer simultan per sinyal (default: 5 posisi)
+input double BasketTakeProfitUSC=5.0;        // Target profit keranjang total (5.0 USC -> biru langsung jual)
+input double BasketCutLossUSC=30.0;          // Cut-loss keranjang darurat (30.0 USC)
+input int    BasketCooldownMinutes=1;        // Jeda tunggu setelah basket ditutup (1 menit)
+input double BasketLayerStepATR=0.0;         // Jarak antar layer dalam ATR (0.0 = pasang 5 sekaligus bersamaan)
+
 input group "BASIC RISK - mata uang akun, bukan selalu USD"
 input double BaseLot=0.05; // Maximum requested volume; never rounded up.
 input bool   UseAutoLotByRisk=false; // Hitung lot dinamis berbasis toleransi risiko modal (MaxRiskPerTradePct & jarak SL)
@@ -216,6 +224,10 @@ bool GSValidateSettings(string &reason)
       MinConfluenceScore<10 || MinConfluenceScore>100 ||
       LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
+   if(UseFastScalperBasket && (BasketLayers<1 || BasketLayers>10 ||
+      !GSPositive(BasketTakeProfitUSC) || !GSPositive(BasketCutLossUSC) || BasketCooldownMinutes<0 ||
+      BasketLayerStepATR<0.0))
+      return GSReject(reason,"INVALID_FAST_SCALPER_SETTINGS");
    return true;
   }
 #endif
