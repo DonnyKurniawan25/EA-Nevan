@@ -651,7 +651,7 @@ void GSProcess(const bool evaluate_signal)
    double equity=g_storage.RiskEquity();
    double margin=AccountInfoDouble(ACCOUNT_MARGIN);
    bool equity_alarm=reference==EMPTY_VALUE || !GSPositive(reference) || !GSPositive(equity) ||
-                     equity<=reference*EquityShieldMinPctOfReference/100.0;
+                     (!UseFastScalperBasket && equity<=reference*EquityShieldMinPctOfReference/100.0);
    bool is_cent_acct=(AccountInfoString(ACCOUNT_CURRENCY)=="USC");
    double eff_min_margin=(is_cent_acct ? 150.0 : MinMarginLevelPct);
    bool margin_alarm=margin>0.0 && equity/margin*100.0<eff_min_margin;

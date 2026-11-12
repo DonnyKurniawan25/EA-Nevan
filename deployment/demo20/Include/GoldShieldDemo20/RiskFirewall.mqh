@@ -148,7 +148,7 @@ public:
          !MathIsValidNumber(spread_profit) || spread_profit>0.0)
          return GSReject(reason,"MINIMUM_COST_CALCULATION_FAILED");
       double cost_floor=(-spread_profit)*(1.0+RiskBufferPct/100.0)+CostBufferPerLot*spec.volume_min;
-      if(cost_floor>plan.risk_budget+1e-8)
+      if(!UseFastScalperBasket && cost_floor>plan.risk_budget+1e-8)
          return GSReject(reason,"MINIMUM_LOT_COST_EXCEEDS_CAPITAL_RISK");
       bool buy=(side==GS_BUY);
       plan.side=side;
@@ -215,7 +215,7 @@ public:
         {
          double target_vol=MathMax(spec.volume_min,BaseLot);
          double min_cost=loss_per_lot*(1.0+RiskBufferPct/100.0)*target_vol+CostBufferPerLot*target_vol;
-         if(plan.risk_budget<min_cost && equity>=reference*EquityShieldMinPctOfReference/100.0)
+         if(plan.risk_budget<min_cost && (UseFastScalperBasket || equity>=reference*EquityShieldMinPctOfReference/100.0))
             plan.risk_budget=min_cost;
         }
       plan.volume=GSRiskVolume(plan.risk_budget,loss_per_lot,RiskBufferPct,CostBufferPerLot,
