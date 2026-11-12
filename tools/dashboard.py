@@ -2771,8 +2771,11 @@ def get_latest_data():
     deal_file = DATA_DIR / "history_deals.csv"
     deals = parse_csv_file(deal_file)
     if deals:
-        deals.sort(key=lambda d: (d.get("time", ""), d.get("deal", "")), reverse=True)
-        data["deals"] = deals
+        # Hanya tampilkan deal OUT (transaksi tertutup/selesai). Deal IN ($0.00) adalah eksekusi buka posisi.
+        closed_deals = [d for d in deals if d.get("entry", "").upper() == "OUT"]
+        target_deals = closed_deals if closed_deals else deals
+        target_deals.sort(key=lambda d: (d.get("time", ""), d.get("deal", "")), reverse=True)
+        data["deals"] = target_deals
     else:
         # Fallback parse from GS2.*.csv
         trade_map = {}
