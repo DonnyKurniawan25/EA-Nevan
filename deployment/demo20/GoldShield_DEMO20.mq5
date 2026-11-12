@@ -742,9 +742,9 @@ void GSProcess(const bool evaluate_signal)
      }
    g_state.Set(READY,"WAIT_NEXT_CLOSED_BAR",g_log);
    datetime current=iTime(TradeSymbol,SignalTimeframe,0);
-   if(evaluate_signal && current>0 && g_observed_bar==0)
+   if(current>0 && g_observed_bar==0)
       g_observed_bar=current; // History may finish synchronizing after OnInit. Still no attach-time entry.
-   else if(evaluate_signal && current>0 && current!=g_observed_bar)
+   else if(current>0 && current!=g_observed_bar)
      {
       g_observed_bar=current;
       GSMarketSnapshot data;

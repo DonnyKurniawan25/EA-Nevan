@@ -1,17 +1,17 @@
 ; Exness Demo Account Profile - USD Standard/Demo Fast Scalper Basket
-; Simbol: XAUUSDm | Timeframe: M15 | 5 Layers x 0.01 Lot | Basket TP +$5.00 | Cut-Loss -$30.00
+; Simbol: XAUUSDm | Timeframe: M1 | 5 Layers x 0.01 Lot | Basket TP +$5.00 | Cut-Loss -$30.00
 ExecutionMode=2
 EnableAutoTrading=true
 DemoTradingOptIn=true
 AllowRealTrading=false
 TradeSymbol=XAUUSDm
-SignalTimeframe=15
+SignalTimeframe=1
 MagicNumber=2862923531892515
 UseFastScalperBasket=true
 BasketLayers=5
 BasketTakeProfitUSC=5.0
 BasketCutLossUSC=30.0
-BasketCooldownMinutes=1
+BasketCooldownMinutes=0
 BasketLayerStepATR=0.0
 BaseLot=0.01
 UseAutoLotByRisk=false
@@ -55,8 +55,8 @@ UseSteppedProfitLock=true
 UseRSIProfitProtector=true
 RSIExtremeOverbought=75.0
 RSIExtremeOversold=25.0
-UseDynamicLossCooldown=true
-LossCooldownMinutes=60
+UseDynamicLossCooldown=false
+LossCooldownMinutes=0
 UseAggressiveRunnerTrailing=true
 PartialTrailingATR=0.7
 RequireHTFSlopeAlignment=true
@@ -96,7 +96,7 @@ UseSpreadATRFilter=true
 MaxSpreadATRMultiple=0.30
 StaleTickSeconds=15
 MaxDeviationPoints=20
-CooldownMinutes=1
+CooldownMinutes=0
 UseSessionFilter=false
 SessionStartHourServer=2
 SessionEndHourServer=21

@@ -17,7 +17,7 @@ class TestFastScalperBasket(unittest.TestCase):
         self.assertIn("BasketLayers=5", content)
         self.assertIn("BasketTakeProfitUSC=5.0", content)
         self.assertIn("BasketCutLossUSC=30.0", content)
-        self.assertIn("BasketCooldownMinutes=1", content)
+        self.assertIn("BasketCooldownMinutes=0", content)
         self.assertIn("MaxAccountPositions=5", content)
         self.assertIn("MaxTotalAccountLots=0.05", content)
 

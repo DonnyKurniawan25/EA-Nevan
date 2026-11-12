@@ -193,7 +193,7 @@ bool GSValidateSettings(string &reason)
    if(!GSPositive(EquityShieldMinPctOfReference) || EquityShieldMinPctOfReference>=100.0 ||
       !GSPositive(MaxPositionLossPct) || MaxPositionLossPct>2.0 ||
       MaxAllowedSpreadPoints<1 || StaleTickSeconds<1 || MaxDeviationPoints<0 ||
-      CooldownMinutes<1 || SessionStartHourServer<0 || SessionStartHourServer>23 ||
+      CooldownMinutes<0 || SessionStartHourServer<0 || SessionStartHourServer>23 ||
       SessionEndHourServer<1 || SessionEndHourServer>24 ||
       SessionStartHourServer>=SessionEndHourServer ||
       !GSPositive(MaxSpreadATRMultiple) || MaxSpreadATRMultiple>2.0 ||
@@ -222,7 +222,7 @@ bool GSValidateSettings(string &reason)
       DailyProfitTargetUSD<0.0 || WeeklyOpenWaitMinutes<0 || WeeklyOpenWaitMinutes>120 ||
       MidnightCloseMinuteServer<0 || MidnightCloseMinuteServer>59 ||
       MinConfluenceScore<10 || MinConfluenceScore>100 ||
-      LossCooldownMinutes<1 || !GSPositive(PartialTrailingATR))
+      LossCooldownMinutes<0 || !GSPositive(PartialTrailingATR))
       return GSReject(reason,"INVALID_PROTECTION_SETTINGS");
    if(UseFastScalperBasket && (BasketLayers<1 || BasketLayers>10 ||
       !GSPositive(BasketTakeProfitUSC) || !GSPositive(BasketCutLossUSC) || BasketCooldownMinutes<0 ||
