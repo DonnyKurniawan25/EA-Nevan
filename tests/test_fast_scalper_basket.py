@@ -19,7 +19,7 @@ class TestFastScalperBasket(unittest.TestCase):
         self.assertIn("BasketCutLossUSC=20.0", content)
         self.assertIn("BasketCooldownMinutes=0", content)
         self.assertIn("MaxAccountPositions=5", content)
-        self.assertIn("MaxTotalAccountLots=0.05", content)
+        self.assertIn("MaxTotalAccountLots=0.10", content)
 
     def test_notifier_basket_translations(self):
         self.assertIn("BASKET_PROFIT_EXIT", LABELS)

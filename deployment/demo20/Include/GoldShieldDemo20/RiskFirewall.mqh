@@ -194,7 +194,8 @@ public:
       bool is_cent=(AccountInfoString(ACCOUNT_CURRENCY)=="USC");
       if(UseFastScalperBasket || is_cent)
         {
-         double min_cost=loss_per_lot*(1.0+RiskBufferPct/100.0)*spec.volume_min+CostBufferPerLot*spec.volume_min;
+         double target_vol=MathMax(spec.volume_min,BaseLot);
+         double min_cost=loss_per_lot*(1.0+RiskBufferPct/100.0)*target_vol+CostBufferPerLot*target_vol;
          if(plan.risk_budget<min_cost && equity>=reference*EquityShieldMinPctOfReference/100.0)
             plan.risk_budget=min_cost;
         }
