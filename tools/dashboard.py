@@ -1420,10 +1420,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             <div class="stat-card card-amber">
                 <div class="stat-label">
-                    <span>Kuota Demo & Status</span>
+                    <span>Transaksi & Mode</span>
                     <span>⏱️</span>
                 </div>
-                <div class="stat-value" id="val-quota">0/20</div>
+                <div class="stat-value" id="val-quota">Tanpa Batas</div>
                 <div class="stat-sub">
                     <span>State:</span>
                     <strong class="mono" id="val-state">READY</strong>
@@ -2201,11 +2201,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 },
                 {
                     id: 'daily_quota',
-                    name: '14. Batas Kuota Transaksi Harian (Maks 20 Entri)',
-                    condition: 'Mencegah overtrading berlebih dan melindungi modal harian.',
-                    current: `Entri hari ini: ${s.entries_count || 0} / ${s.max_entries || 20}`,
-                    status: isTradeActive || (rsn !== 'HOLD_DAILY_ENTRY_LIMIT' && rsn !== 'HOLD_DAILY_PROFIT_TARGET_REACHED') ? 'pass' : 'block',
-                    badgeText: rsn === 'HOLD_DAILY_PROFIT_TARGET_REACHED' ? 'TARGET 2% TERCAPAI 🏆' : (rsn === 'HOLD_DAILY_ENTRY_LIMIT' ? 'KUOTA HABIS 🛑' : 'MEMENUHI ✅ (Pelindung Mutlak)'),
+                    name: '14. Batas Transaksi Harian (Fast Scalper 24 Jam)',
+                    condition: 'Mode Fast Scalper Basket: berjalan kontinu 24 jam tanpa batas 20 kuota.',
+                    current: `Selesai: ${s.closed_positions || 0} deal | Mode: Unlimited 24 Jam`,
+                    status: 'pass',
+                    badgeText: 'AKTIF 24 JAM 🚀 (Tanpa Batas)',
                     poin: 'Pelindung Mutlak'
                 },
                 {
@@ -2286,10 +2286,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             floatEl.textContent = formatProfit(totalFloating);
             floatEl.className = 'mono ' + (totalFloating > 0 ? 'val-profit' : (totalFloating < 0 ? 'val-loss' : ''));
 
-            // Quota
+            // Quota / Mode
             const closed = s.closed_positions || '0';
-            const limit = s.limit || '20';
-            document.getElementById('val-quota').textContent = `${closed}/${limit}`;
+            document.getElementById('val-quota').textContent = `${closed} / ∞ (Tanpa Batas)`;
             document.getElementById('val-state').textContent = s.core_state || 'READY';
 
             // Counts
