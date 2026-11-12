@@ -118,5 +118,5 @@ MaxConsecutiveLossesPerDay=3
 MaxEntriesPerDay=50
 UseDynamicDailyQuota=true
 MaxDynamicEntriesPerDay=50
-CapitalLimitUSD=10.0
+CapitalLimitUSD=0.0
 RequiredAccountCurrency=USC
